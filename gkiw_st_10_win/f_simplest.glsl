@@ -14,7 +14,7 @@ out vec4 pixelColor; //Zmienna wyjsciowa fragment shadera. Zapisuje sie do niej 
 
 
 void main(void) {
-	vec4 kd = mix(texture(textureMap0, iTexCoord0), texture(textureMap1, iTexCoord1), 0.3);
+	vec4 kd = mix(texture(textureMap0, iTexCoord0), texture(textureMap1, iTexCoord1), 0);
 	vec4 ks = vec4(1,1,1,1);
 
 	vec4 ml = normalize(l);
@@ -26,4 +26,5 @@ void main(void) {
 	float rv = pow(clamp(dot(mr, mv), 0, 1), 25); // Kosinus kąta pomiędzy wektorami r i v podniesiony do 25 potęgi
 
 	pixelColor = vec4(nl * kd.rgb, kd.a) + vec4(ks.rgb*rv, 0); //Wyliczenie modelu oświetlenia (bez ambient);
+	//pixelColor = vec4(1.0f, 1.0f, 0.0f, 1.0f);
 }

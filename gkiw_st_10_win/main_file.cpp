@@ -32,6 +32,11 @@ Place, Fifth Floor, Boston, MA  02110 - 1301  USA
 #include "shaderprogram.h"
 #include "myCube.h"
 #include "myTeapot.h"
+#include <assimp/Importer.hpp>      // C++ importer interface
+#include <assimp/scene.h>           // Output data structure
+#include <assimp/postprocess.h>     // Post processing flags
+#include <iostream>
+
 
 float speed_x=0;
 float speed_y=0;
@@ -67,7 +72,97 @@ GLuint readTexture(const char* filename) {
 //float* texCoords = myCubeTexCoords;
 //float* colors = myCubeColors;
 //int vertexCount = myCubeVertexCount;
+// c
 
+
+
+struct Model3D {
+	float* vertices;
+	float* normals;
+	float* texCoords;
+	int vertexCount = 0;
+	
+	void printModel() {
+		std::cout << "Model3D:\n";
+
+		std::cout << "Vertices:\n";
+		for (int i = 0; i < vertexCount * 4; i += 4) {
+			std::cout << "  [" << i / 4 << "]: ("
+				<< vertices[i] << ", "
+				<< vertices[i + 1] << ", "
+				<< vertices[i + 2] << ", "
+				<< vertices[i + 3] << ")\n";
+		}
+
+		std::cout << "Normals:\n";
+		for (int i = 0; i < vertexCount * 4; i += 4) {
+			std::cout << "  [" << i / 4 << "]: ("
+				<< normals[i] << ", "
+				<< normals[i + 1] << ", "
+				<< normals[i + 2] << ", "
+				<< normals[i + 3] << ")\n";
+		}
+
+		std::cout << "Texture Coords:\n";
+		for (int i = 0; i < vertexCount * 2; i += 2) {
+			std::cout << "  [" << i / 2 << "]: ("
+				<< texCoords[i] << ", "
+				<< texCoords[i + 1] << ")\n";
+		}
+
+		std::cout << "Total Vertices: " << vertexCount << "\n";
+	}
+
+};
+Model3D testModel;
+
+void loadModel(Model3D& model) {
+
+	Assimp::Importer importer;
+	const aiScene* scene = importer.ReadFile("model1.fbx",
+		aiProcess_Triangulate |
+		aiProcess_FlipUVs |
+		aiProcess_CalcTangentSpace);
+
+	if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
+		std::cerr << "ERROR::ASSIMP::" << importer.GetErrorString() << std::endl;
+		return;
+	}
+
+	aiMesh* mesh = scene->mMeshes[0]; // assuming one mesh
+
+	std::vector<float> vertices_local;
+	std::vector<float> normals_local;
+	std::vector<float> texCoords_local;
+	for (unsigned int i = 0; i < mesh->mNumVertices; i++) {
+		aiVector3D pos = mesh->mVertices[i];
+		aiVector3D normal = mesh->mNormals[i];
+		aiVector3D texCoord = mesh->HasTextureCoords(0) ? mesh->mTextureCoords[0][i] : aiVector3D(0.0f, 0.0f, 0.0f);
+
+		vertices_local.push_back(pos.x);
+		vertices_local.push_back(pos.y);
+		vertices_local.push_back(pos.z);
+		vertices_local.push_back(1.0f);
+		normals_local.push_back(normal.x);
+		normals_local.push_back(normal.y);
+		normals_local.push_back(normal.z);
+		normals_local.push_back(0.0f);
+		texCoords_local.push_back(texCoord.x);
+		texCoords_local.push_back(texCoord.y);
+	}
+
+	model.vertices = new float[vertices_local.size()];
+	std::copy(vertices_local.begin(), vertices_local.end(), model.vertices);
+
+	model.normals = new float[normals_local.size()];
+	std::copy(normals_local.begin(), normals_local.end(), model.normals);
+
+	model.texCoords = new float[texCoords_local.size()];
+	std::copy(texCoords_local.begin(), texCoords_local.end(), model.texCoords);
+
+	model.vertexCount = vertices_local.size()/4;
+	return;
+}
 
 //Odkomentuj, żeby rysować czajnik
 float* vertices = myTeapotVertices;
@@ -114,8 +209,12 @@ void initOpenGLProgram(GLFWwindow* window) {
 	glfwSetKeyCallback(window,keyCallback);
 
 	sp=new ShaderProgram("v_simplest.glsl",NULL,"f_simplest.glsl");
-	tex0 = readTexture("metal.png");
+	tex0 = readTexture("red_brick_diff_4k.png");
 	tex1 = readTexture("sky.png");
+
+
+	loadModel(testModel);
+
 }
 
 
@@ -127,20 +226,22 @@ void freeOpenGLProgram(GLFWwindow* window) {
 }
 
 
+void drawSomeObject() {
+
+}
 
 
 //Procedura rysująca zawartość sceny
-void drawScene(GLFWwindow* window,float angle_x,float angle_y) {
+void drawScene(GLFWwindow* window,float angle_x,float angle_y, Model3D& model) {
 	//************Tutaj umieszczaj kod rysujący obraz******************l
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	glm::mat4 V=glm::lookAt(
-         glm::vec3(0, 0, -3),
+         glm::vec3(0, 0, -10),
          glm::vec3(0,0,0),
          glm::vec3(0.0f,1.0f,0.0f)); //Wylicz macierz widoku
 
     glm::mat4 P=glm::perspective(50.0f*PI/180.0f, aspectRatio, 0.01f, 50.0f); //Wylicz macierz rzutowania
-
     glm::mat4 M=glm::mat4(1.0f);
 	M=glm::rotate(M,angle_y,glm::vec3(1.0f,0.0f,0.0f)); //Wylicz macierz modelu
 	M=glm::rotate(M,angle_x,glm::vec3(0.0f,1.0f,0.0f)); //Wylicz macierz modelu
@@ -152,20 +253,19 @@ void drawScene(GLFWwindow* window,float angle_x,float angle_y) {
     glUniformMatrix4fv(sp->u("M"),1,false,glm::value_ptr(M));
 	glUniform4f(sp->u("lp"), 0, 0, -6, 1);
 	glUniform1i(sp->u("textureMap0"), 0); //drawScene
-	glUniform1i(sp->u("textureMap1"), 1); //drawScene
 
     glEnableVertexAttribArray(sp->a("vertex"));  //Włącz przesyłanie danych do atrybutu vertex
-    glVertexAttribPointer(sp->a("vertex"),4,GL_FLOAT,false,0,vertices); //Wskaż tablicę z danymi dla atrybutu vertex
+    glVertexAttribPointer(sp->a("vertex"),4,GL_FLOAT,false,0, model.vertices); //Wskaż tablicę z danymi dla atrybutu vertex
 
-	glEnableVertexAttribArray(sp->a("color"));  //Włącz przesyłanie danych do atrybutu color
-	glVertexAttribPointer(sp->a("color"), 4, GL_FLOAT, false, 0, colors); //Wskaż tablicę z danymi dla atrybutu color
+	//glEnableVertexAttribArray(sp->a("color"));  //Włącz przesyłanie danych do atrybutu color
+	//glVertexAttribPointer(sp->a("color"), 4, GL_FLOAT, false, 0, colors); //Wskaż tablicę z danymi dla atrybutu color
 
 	glEnableVertexAttribArray(sp->a("normal"));  //Włącz przesyłanie danych do atrybutu normal
-	glVertexAttribPointer(sp->a("normal"), 4, GL_FLOAT, false, 0, normals); //Wskaż tablicę z danymi dla atrybutu normal
+	glVertexAttribPointer(sp->a("normal"), 4, GL_FLOAT, false, 0, model.normals); //Wskaż tablicę z danymi dla atrybutu normal
 
 	glEnableVertexAttribArray(sp->a("texCoord0"));
 	glVertexAttribPointer(sp->a("texCoord0"),
-		2, GL_FLOAT, false, 0, texCoords);//odpowiednia tablica
+		2, GL_FLOAT, false, 0, model.texCoords);//odpowiednia tablica
 
 
 	glActiveTexture(GL_TEXTURE0);
@@ -175,10 +275,10 @@ void drawScene(GLFWwindow* window,float angle_x,float angle_y) {
 	glBindTexture(GL_TEXTURE_2D, tex1);
 
 
-    glDrawArrays(GL_TRIANGLES,0,vertexCount); //Narysuj obiekt
+    glDrawArrays(GL_TRIANGLES,0, model.vertexCount); //Narysuj obiekt
 
     glDisableVertexAttribArray(sp->a("vertex"));  //Wyłącz przesyłanie danych do atrybutu vertex
-	glDisableVertexAttribArray(sp->a("color"));  //Wyłącz przesyłanie danych do atrybutu color
+	//glDisableVertexAttribArray(sp->a("color"));  //Wyłącz przesyłanie danych do atrybutu color
 	glDisableVertexAttribArray(sp->a("normal"));  //Wyłącz przesyłanie danych do atrybutu normal
 	glDisableVertexAttribArray(sp->a("texCoord0"));
 
@@ -225,7 +325,7 @@ int main(void)
         angle_x+=speed_x*glfwGetTime(); //Zwiększ/zmniejsz kąt obrotu na podstawie prędkości i czasu jaki upłynał od poprzedniej klatki
         angle_y+=speed_y*glfwGetTime(); //Zwiększ/zmniejsz kąt obrotu na podstawie prędkości i czasu jaki upłynał od poprzedniej klatki
         glfwSetTime(0); //Zeruj timer
-		drawScene(window,angle_x,angle_y); //Wykonaj procedurę rysującą
+		drawScene(window,angle_x,angle_y, testModel); //Wykonaj procedurę rysującą
 		glfwPollEvents(); //Wykonaj procedury callback w zalezności od zdarzeń jakie zaszły.
 	}
 
