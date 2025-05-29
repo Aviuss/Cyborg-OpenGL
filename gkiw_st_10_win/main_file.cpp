@@ -32,14 +32,13 @@ Place, Fifth Floor, Boston, MA  02110 - 1301  USA
 #include "shaderprogram.h"
 #include "myCube.h"
 #include "myTeapot.h"
+
 #include <assimp/Importer.hpp>      // C++ importer interface
 #include <assimp/scene.h>           // Output data structure
 #include <assimp/postprocess.h>     // Post processing flags
 #include <iostream>
 
 
-float speed_x=0;
-float speed_y=0;
 float aspectRatio=1;
 
 ShaderProgram *sp;
@@ -66,13 +65,22 @@ GLuint readTexture(const char* filename) {
 	return tex;
 }
 
-//Odkomentuj, żeby rysować kostkę
-//float* vertices = myCubeVertices;
-//float* normals = myCubeNormals;
-//float* texCoords = myCubeTexCoords;
-//float* colors = myCubeColors;
-//int vertexCount = myCubeVertexCount;
-// c
+struct ControlData {
+	
+	float angle_x = 0;
+	float angle_y = 0;
+
+
+	void updateControlLoop(float deltaTime) {
+		angle_x += speed_x * deltaTime; //Zwiększ/zmniejsz kąt obrotu na podstawie prędkości i czasu jaki upłynał od poprzedniej klatki
+		angle_y += speed_y * deltaTime; //Zwiększ/zmniejsz kąt obrotu na podstawie prędkości i czasu jaki upłynał od poprzedniej klatki
+	}
+
+	float speed_x = 0;
+	float speed_y = 0;
+
+};
+ControlData controlData;
 
 
 
@@ -81,14 +89,15 @@ struct Model3D {
 	float* normals;
 	float* texCoords;
 	int vertexCount = 0;
+	glm::mat4 localMatrix = glm::mat4(1.0f);
+
 	
 	void printModel() {
 		std::cout << "Model3D:\n";
 
 		std::cout << "Vertices:\n";
 		for (int i = 0; i < vertexCount * 4; i += 4) {
-			std::cout << "  [" << i / 4 << "]: ("
-				<< vertices[i] << ", "
+			std::cout << "  [" << i / 4 << "]: (" << vertices[i] << ", "
 				<< vertices[i + 1] << ", "
 				<< vertices[i + 2] << ", "
 				<< vertices[i + 3] << ")\n";
@@ -113,13 +122,67 @@ struct Model3D {
 		std::cout << "Total Vertices: " << vertexCount << "\n";
 	}
 
-};
-Model3D testModel;
+	void drawOpenGL(glm::mat4& P, glm::mat4& V) {
 
-void loadModel(Model3D& model) {
+		sp->use();//Aktywacja programu cieniującego
+		//Przeslij parametry programu cieniującego do karty graficznej
+		glUniformMatrix4fv(sp->u("P"), 1, false, glm::value_ptr(P));
+		glUniformMatrix4fv(sp->u("V"), 1, false, glm::value_ptr(V));
+		glUniformMatrix4fv(sp->u("M"), 1, false, glm::value_ptr(localMatrix));
+		glUniform4f(sp->u("lp"), 0, 0, -6, 1);
+		glUniform1i(sp->u("textureMap0"), 0); //drawScene
+
+		glEnableVertexAttribArray(sp->a("vertex"));  //Włącz przesyłanie danych do atrybutu vertex
+		glVertexAttribPointer(sp->a("vertex"), 4, GL_FLOAT, false, 0, vertices); //Wskaż tablicę z danymi dla atrybutu vertex
+
+		//glEnableVertexAttribArray(sp->a("color"));  //Włącz przesyłanie danych do atrybutu color
+		//glVertexAttribPointer(sp->a("color"), 4, GL_FLOAT, false, 0, colors); //Wskaż tablicę z danymi dla atrybutu color
+
+		glEnableVertexAttribArray(sp->a("normal"));  //Włącz przesyłanie danych do atrybutu normal
+		glVertexAttribPointer(sp->a("normal"), 4, GL_FLOAT, false, 0, normals); //Wskaż tablicę z danymi dla atrybutu normal
+
+		glEnableVertexAttribArray(sp->a("texCoord0"));
+		glVertexAttribPointer(sp->a("texCoord0"),
+			2, GL_FLOAT, false, 0, texCoords);//odpowiednia tablica
+
+
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, tex0);
+
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, tex1);
+
+
+		glDrawArrays(GL_TRIANGLES, 0, vertexCount); //Narysuj obiekt
+
+		glDisableVertexAttribArray(sp->a("vertex"));  //Wyłącz przesyłanie danych do atrybutu vertex
+		//glDisableVertexAttribArray(sp->a("color"));  //Wyłącz przesyłanie danych do atrybutu color
+		glDisableVertexAttribArray(sp->a("normal"));  //Wyłącz przesyłanie danych do atrybutu normal
+		glDisableVertexAttribArray(sp->a("texCoord0"));
+
+	}
+};
+
+
+struct RobotStructure {
+	Model3D robotTorso;
+
+	void robotMovementLogic(ControlData inputData) {
+		robotTorso.localMatrix = glm::mat4(1.0f);
+		robotTorso.localMatrix = glm::rotate(robotTorso.localMatrix, inputData.angle_y, glm::vec3(1.0f, 0.0f, 0.0f)); //Wylicz macierz modelu
+		robotTorso.localMatrix = glm::rotate(robotTorso.localMatrix, inputData.angle_x, glm::vec3(0.0f, 1.0f, 0.0f)); //Wylicz macierz modelu
+
+	}
+};
+
+RobotStructure robotStructure;
+
+
+
+void loadModel(Model3D& model, std::string fileName) {
 
 	Assimp::Importer importer;
-	const aiScene* scene = importer.ReadFile("model1.fbx",
+	const aiScene* scene = importer.ReadFile(fileName,
 		aiProcess_Triangulate |
 		aiProcess_FlipUVs |
 		aiProcess_CalcTangentSpace);
@@ -164,14 +227,9 @@ void loadModel(Model3D& model) {
 	return;
 }
 
-//Odkomentuj, żeby rysować czajnik
-float* vertices = myTeapotVertices;
-float* normals = myTeapotVertexNormals;
-float* texCoords = myTeapotTexCoords;
-float* colors = myTeapotColors;
-int vertexCount = myTeapotVertexCount;
-
-
+void loadRobot(RobotStructure& robot) {
+	loadModel(robot.robotTorso, "robot_torso.fbx");
+}
 
 //Procedura obsługi błędów
 void error_callback(int error, const char* description) {
@@ -181,16 +239,16 @@ void error_callback(int error, const char* description) {
 
 void keyCallback(GLFWwindow* window,int key,int scancode,int action,int mods) {
     if (action==GLFW_PRESS) {
-        if (key==GLFW_KEY_LEFT) speed_x=-PI/2;
-        if (key==GLFW_KEY_RIGHT) speed_x=PI/2;
-        if (key==GLFW_KEY_UP) speed_y=PI/2;
-        if (key==GLFW_KEY_DOWN) speed_y=-PI/2;
+        if (key==GLFW_KEY_LEFT) controlData.speed_x=-PI/2;
+        if (key==GLFW_KEY_RIGHT) controlData.speed_x=PI/2;
+        if (key==GLFW_KEY_UP) controlData.speed_y=PI/2;
+        if (key==GLFW_KEY_DOWN) controlData.speed_y=-PI/2;
     }
     if (action==GLFW_RELEASE) {
-        if (key==GLFW_KEY_LEFT) speed_x=0;
-        if (key==GLFW_KEY_RIGHT) speed_x=0;
-        if (key==GLFW_KEY_UP) speed_y=0;
-        if (key==GLFW_KEY_DOWN) speed_y=0;
+        if (key==GLFW_KEY_LEFT) controlData.speed_x=0;
+        if (key==GLFW_KEY_RIGHT) controlData.speed_x=0;
+        if (key==GLFW_KEY_UP) controlData.speed_y=0;
+        if (key==GLFW_KEY_DOWN) controlData.speed_y=0;
     }
 }
 
@@ -213,7 +271,7 @@ void initOpenGLProgram(GLFWwindow* window) {
 	tex1 = readTexture("sky.png");
 
 
-	loadModel(testModel);
+	loadRobot(robotStructure);
 
 }
 
@@ -226,13 +284,10 @@ void freeOpenGLProgram(GLFWwindow* window) {
 }
 
 
-void drawSomeObject() {
-
-}
 
 
 //Procedura rysująca zawartość sceny
-void drawScene(GLFWwindow* window,float angle_x,float angle_y, Model3D& model) {
+void drawScene(GLFWwindow* window, RobotStructure& robot) {
 	//************Tutaj umieszczaj kod rysujący obraz******************l
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -242,45 +297,9 @@ void drawScene(GLFWwindow* window,float angle_x,float angle_y, Model3D& model) {
          glm::vec3(0.0f,1.0f,0.0f)); //Wylicz macierz widoku
 
     glm::mat4 P=glm::perspective(50.0f*PI/180.0f, aspectRatio, 0.01f, 50.0f); //Wylicz macierz rzutowania
-    glm::mat4 M=glm::mat4(1.0f);
-	M=glm::rotate(M,angle_y,glm::vec3(1.0f,0.0f,0.0f)); //Wylicz macierz modelu
-	M=glm::rotate(M,angle_x,glm::vec3(0.0f,1.0f,0.0f)); //Wylicz macierz modelu
-
-    sp->use();//Aktywacja programu cieniującego
-    //Przeslij parametry programu cieniującego do karty graficznej
-    glUniformMatrix4fv(sp->u("P"),1,false,glm::value_ptr(P));
-    glUniformMatrix4fv(sp->u("V"),1,false,glm::value_ptr(V));
-    glUniformMatrix4fv(sp->u("M"),1,false,glm::value_ptr(M));
-	glUniform4f(sp->u("lp"), 0, 0, -6, 1);
-	glUniform1i(sp->u("textureMap0"), 0); //drawScene
-
-    glEnableVertexAttribArray(sp->a("vertex"));  //Włącz przesyłanie danych do atrybutu vertex
-    glVertexAttribPointer(sp->a("vertex"),4,GL_FLOAT,false,0, model.vertices); //Wskaż tablicę z danymi dla atrybutu vertex
-
-	//glEnableVertexAttribArray(sp->a("color"));  //Włącz przesyłanie danych do atrybutu color
-	//glVertexAttribPointer(sp->a("color"), 4, GL_FLOAT, false, 0, colors); //Wskaż tablicę z danymi dla atrybutu color
-
-	glEnableVertexAttribArray(sp->a("normal"));  //Włącz przesyłanie danych do atrybutu normal
-	glVertexAttribPointer(sp->a("normal"), 4, GL_FLOAT, false, 0, model.normals); //Wskaż tablicę z danymi dla atrybutu normal
-
-	glEnableVertexAttribArray(sp->a("texCoord0"));
-	glVertexAttribPointer(sp->a("texCoord0"),
-		2, GL_FLOAT, false, 0, model.texCoords);//odpowiednia tablica
-
-
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, tex0);
-
-	glActiveTexture(GL_TEXTURE1);
-	glBindTexture(GL_TEXTURE_2D, tex1);
-
-
-    glDrawArrays(GL_TRIANGLES,0, model.vertexCount); //Narysuj obiekt
-
-    glDisableVertexAttribArray(sp->a("vertex"));  //Wyłącz przesyłanie danych do atrybutu vertex
-	//glDisableVertexAttribArray(sp->a("color"));  //Wyłącz przesyłanie danych do atrybutu color
-	glDisableVertexAttribArray(sp->a("normal"));  //Wyłącz przesyłanie danych do atrybutu normal
-	glDisableVertexAttribArray(sp->a("texCoord0"));
+    
+	robot.robotMovementLogic(controlData);
+	robot.robotTorso.drawOpenGL(P, V);
 
     glfwSwapBuffers(window); //Przerzuć tylny bufor na przedni
 }
@@ -289,16 +308,12 @@ void drawScene(GLFWwindow* window,float angle_x,float angle_y, Model3D& model) {
 int main(void)
 {
 	GLFWwindow* window; //Wskaźnik na obiekt reprezentujący okno
-
 	glfwSetErrorCallback(error_callback);//Zarejestruj procedurę obsługi błędów
-
 	if (!glfwInit()) { //Zainicjuj bibliotekę GLFW
 		fprintf(stderr, "Nie można zainicjować GLFW.\n");
 		exit(EXIT_FAILURE);
 	}
-
 	window = glfwCreateWindow(500, 500, "OpenGL", NULL, NULL);  //Utwórz okno 500x500 o tytule "OpenGL" i kontekst OpenGL.
-
 	if (!window) //Jeżeli okna nie udało się utworzyć, to zamknij program
 	{
 		fprintf(stderr, "Nie można utworzyć okna.\n");
@@ -317,15 +332,12 @@ int main(void)
 	initOpenGLProgram(window); //Operacje inicjujące
 
 	//Główna pętla
-	float angle_x=0; //Aktualny kąt obrotu obiektu
-	float angle_y=0; //Aktualny kąt obrotu obiektu
 	glfwSetTime(0); //Zeruj timer
 	while (!glfwWindowShouldClose(window)) //Tak długo jak okno nie powinno zostać zamknięte
 	{
-        angle_x+=speed_x*glfwGetTime(); //Zwiększ/zmniejsz kąt obrotu na podstawie prędkości i czasu jaki upłynał od poprzedniej klatki
-        angle_y+=speed_y*glfwGetTime(); //Zwiększ/zmniejsz kąt obrotu na podstawie prędkości i czasu jaki upłynał od poprzedniej klatki
+		controlData.updateControlLoop(glfwGetTime());
         glfwSetTime(0); //Zeruj timer
-		drawScene(window,angle_x,angle_y, testModel); //Wykonaj procedurę rysującą
+		drawScene(window, robotStructure); //Wykonaj procedurę rysującą
 		glfwPollEvents(); //Wykonaj procedury callback w zalezności od zdarzeń jakie zaszły.
 	}
 
