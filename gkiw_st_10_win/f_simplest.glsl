@@ -25,6 +25,6 @@ void main(void) {
 	float nl = clamp(dot(mn, ml), 0, 1); //Kosinus kąta pomiędzy wektorami n i l.
 	float rv = pow(clamp(dot(mr, mv), 0, 1), 25); // Kosinus kąta pomiędzy wektorami r i v podniesiony do 25 potęgi
 
-	pixelColor = vec4(0.3, 0.3, 0.3, 1) + vec4(nl * kd.rgb, kd.a) + vec4(ks.rgb*rv, 0); //Wyliczenie modelu oświetlenia (bez ambient);
+	pixelColor = vec4(0.3, 0.3, 0.3, 1) + vec4(/*nl **/ 0.5* kd.rgb, kd.a) + vec4(ks.rgb*rv, 0); //Wyliczenie modelu oświetlenia (bez ambient);
 	//pixelColor = vec4(1.0f, 1.0f, 0.0f, 1.0f);
 }
