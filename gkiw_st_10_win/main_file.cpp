@@ -69,18 +69,21 @@ struct ControlData {
 	
 	float angle_x = 0;
 	float angle_y = 0;
+	float val = 0;
 
 
 	void updateControlLoop(float deltaTime) {
 		angle_x += speed_x * deltaTime; //Zwiększ/zmniejsz kąt obrotu na podstawie prędkości i czasu jaki upłynał od poprzedniej klatki
 		angle_y += speed_y * deltaTime; //Zwiększ/zmniejsz kąt obrotu na podstawie prędkości i czasu jaki upłynał od poprzedniej klatki
+		val += val_speed * deltaTime;
 	}
 
 	float speed_x = 0;
 	float speed_y = 0;
 
+	float val_speed = 0;
 };
-ControlData controlData;
+ControlData inputControlData;
 
 
 
@@ -90,6 +93,8 @@ struct Model3D {
 	float* texCoords;
 	int vertexCount = 0;
 	glm::mat4 localMatrix = glm::mat4(1.0f);
+	glm::vec3 localTransform = glm::vec3(0.0f, 0.0f, 0.0f);
+	glm::vec3 localXYZEulerRotation = glm::vec3(0.0f, 0.0f, 0.0f);
 
 	
 	void printModel() {
@@ -161,17 +166,137 @@ struct Model3D {
 		glDisableVertexAttribArray(sp->a("texCoord0"));
 
 	}
+
+	inline void applyTransform(glm::mat4& originMatrix) {
+		localMatrix = glm::translate(originMatrix, localTransform);
+	}
+	
+
+	inline void applyRotation() {
+		localMatrix = glm::rotate(localMatrix, localXYZEulerRotation.x, glm::vec3(1.0f, 0.0f, 0.0f));
+		localMatrix = glm::rotate(localMatrix, localXYZEulerRotation.y, glm::vec3(0.0f, 1.0f, 0.0f));
+		localMatrix = glm::rotate(localMatrix, localXYZEulerRotation.z, glm::vec3(0.0f, 0.0f, 1.0f));
+	}
 };
 
 
 struct RobotStructure {
+	Model3D robotHead;
 	Model3D robotTorso;
+	Model3D robotTorsoJoint;
+	Model3D robotLegsHolder;
+	
+	Model3D robotLeftLeg;
+	Model3D robotLeftLeg2;
+	Model3D robotLeftFoot;
 
-	void robotMovementLogic(ControlData inputData) {
-		robotTorso.localMatrix = glm::mat4(1.0f);
-		robotTorso.localMatrix = glm::rotate(robotTorso.localMatrix, inputData.angle_y, glm::vec3(1.0f, 0.0f, 0.0f)); //Wylicz macierz modelu
-		robotTorso.localMatrix = glm::rotate(robotTorso.localMatrix, inputData.angle_x, glm::vec3(0.0f, 1.0f, 0.0f)); //Wylicz macierz modelu
+	Model3D robotRightLeg;
+	Model3D robotRightLeg2;
+	Model3D robotRightFoot;
 
+	Model3D robotLeftArm;
+	Model3D robotLeftArm2;
+	Model3D robotLeftHand;
+
+	Model3D robotRightArm;
+	Model3D robotRightArm2;
+	Model3D robotRightHand;
+
+	inline void directKinematicsLogic() {
+		glm::mat4 identityMatrix = glm::mat4(1.0f);
+		robotTorso.applyTransform(identityMatrix);
+		robotTorso.applyRotation();
+
+		robotHead.applyTransform(robotTorso.localMatrix);
+		robotHead.applyRotation();
+		
+		robotTorsoJoint.applyTransform(robotTorso.localMatrix);
+		robotTorsoJoint.applyRotation();
+
+		robotLegsHolder.applyTransform(robotTorso.localMatrix);
+		robotLegsHolder.applyRotation();
+
+		robotLeftLeg.applyTransform(robotLegsHolder.localMatrix);
+		robotLeftLeg.applyRotation();
+
+		robotLeftLeg2.applyTransform(robotLeftLeg.localMatrix);
+		robotLeftLeg2.applyRotation();
+
+		robotLeftFoot.applyTransform(robotLeftLeg2.localMatrix);
+		robotLeftFoot.applyRotation();
+
+		robotRightLeg.applyTransform(robotLegsHolder.localMatrix);
+		robotRightLeg.applyRotation();
+
+		robotRightLeg2.applyTransform(robotRightLeg.localMatrix);
+		robotRightLeg2.applyRotation();
+		
+		robotRightFoot.applyTransform(robotRightLeg2.localMatrix);
+		robotRightFoot.applyRotation();
+
+		robotLeftArm.applyTransform(robotTorso.localMatrix);
+		robotLeftArm.applyRotation();
+
+		robotLeftArm2.applyTransform(robotLeftArm.localMatrix);
+		robotLeftArm2.applyRotation();
+
+		robotLeftHand.applyTransform(robotLeftArm2.localMatrix);
+		robotLeftHand.applyRotation();
+
+		robotRightArm.applyTransform(robotTorso.localMatrix);
+		robotRightArm.applyRotation();
+
+		robotRightArm2.applyTransform(robotRightArm.localMatrix);
+		robotRightArm2.applyRotation();
+
+		robotRightHand.applyTransform(robotRightArm2.localMatrix);
+		robotRightHand.applyRotation();
+	}
+
+	inline void drawWholeRobot(glm::mat4& P, glm::mat4& V) {
+		robotHead.drawOpenGL(P, V);
+		robotTorso.drawOpenGL(P, V);
+		robotTorsoJoint.drawOpenGL(P, V);
+		robotLegsHolder.drawOpenGL(P, V);
+
+		robotLeftLeg.drawOpenGL(P, V);
+		robotLeftLeg2.drawOpenGL(P, V);
+		robotLeftFoot.drawOpenGL(P, V);
+		
+		robotRightLeg.drawOpenGL(P, V);
+		robotRightLeg2.drawOpenGL(P, V);
+		robotRightFoot.drawOpenGL(P, V);
+
+		robotLeftArm.drawOpenGL(P, V);
+		robotLeftArm2.drawOpenGL(P, V);
+		robotLeftHand.drawOpenGL(P, V);
+
+		robotRightArm.drawOpenGL(P, V);
+		robotRightArm2.drawOpenGL(P, V);
+		robotRightHand.drawOpenGL(P, V);
+	}
+
+	inline void initRobotValues() {
+		robotTorso.localTransform = glm::vec3(0, 0, 5);
+		robotHead.localTransform = glm::vec3(0,0, 1.46724);
+		robotTorsoJoint.localTransform = glm::vec3(0.0f, 0.0f, -1.0f);
+		robotLegsHolder.localTransform = glm::vec3(0.0f, 0.0f, -2.0f);
+
+		robotLeftLeg.localTransform = glm::vec3(-0.699591, 0.0f, -0.366832);
+		robotLeftLeg2.localTransform = glm::vec3(-0.28473, 0.0f, -1.58215);
+		robotLeftFoot.localTransform = glm::vec3(0.30515, 0, -2.29);
+		
+		robotRightLeg.localTransform = glm::vec3(0.699591, 0.0f, -0.366832);
+		robotRightLeg2.localTransform = glm::vec3(0.28473, 0.0f, -1.58215);
+		robotRightFoot.localTransform = glm::vec3(-0.30515,0, -2.29);
+
+		robotLeftArm.localTransform = glm::vec3(-2.22455, -0.359883, 0.333555);
+		robotLeftArm2.localTransform = glm::vec3(-0.0724277, -0.0241681, -2.04295);
+		robotLeftHand.localTransform = glm::vec3(0.0832711, 0, -1.66374);
+
+		robotRightArm.localTransform = glm::vec3(2.22455, -0.359883, 0.333555);
+		robotRightArm2.localTransform = glm::vec3(0.0724277, -0.0241681, -2.04295);
+		robotRightHand.localTransform = glm::vec3(-0.0832711, 0, -1.66374);
 	}
 };
 
@@ -192,28 +317,33 @@ void loadModel(Model3D& model, std::string fileName) {
 		return;
 	}
 
-	aiMesh* mesh = scene->mMeshes[0]; // assuming one mesh
-
 	std::vector<float> vertices_local;
 	std::vector<float> normals_local;
 	std::vector<float> texCoords_local;
-	for (unsigned int i = 0; i < mesh->mNumVertices; i++) {
-		aiVector3D pos = mesh->mVertices[i];
-		aiVector3D normal = mesh->mNormals[i];
-		aiVector3D texCoord = mesh->HasTextureCoords(0) ? mesh->mTextureCoords[0][i] : aiVector3D(0.0f, 0.0f, 0.0f);
+	
+	for (int meshId = 0; meshId < scene->mNumMeshes; meshId ++) {
+		aiMesh* mesh = scene->mMeshes[meshId];
 
-		vertices_local.push_back(pos.x);
-		vertices_local.push_back(pos.y);
-		vertices_local.push_back(pos.z);
-		vertices_local.push_back(1.0f);
-		normals_local.push_back(normal.x);
-		normals_local.push_back(normal.y);
-		normals_local.push_back(normal.z);
-		normals_local.push_back(0.0f);
-		texCoords_local.push_back(texCoord.x);
-		texCoords_local.push_back(texCoord.y);
+		for (unsigned int i = 0; i < mesh->mNumVertices; i++) {
+			aiVector3D pos = mesh->mVertices[i];
+			aiVector3D normal = mesh->mNormals[i];
+			aiVector3D texCoord = mesh->HasTextureCoords(0) ? mesh->mTextureCoords[0][i] : aiVector3D(0.0f, 0.0f, 0.0f);
+
+			vertices_local.push_back(pos.x);
+			vertices_local.push_back(pos.y);
+			vertices_local.push_back(pos.z);
+			vertices_local.push_back(1.0f);
+			normals_local.push_back(normal.x);
+			normals_local.push_back(normal.y);
+			normals_local.push_back(normal.z);
+			normals_local.push_back(0.0f);
+			texCoords_local.push_back(texCoord.x);
+			texCoords_local.push_back(texCoord.y);
+		}
+
 	}
 
+	
 	model.vertices = new float[vertices_local.size()];
 	std::copy(vertices_local.begin(), vertices_local.end(), model.vertices);
 
@@ -229,6 +359,24 @@ void loadModel(Model3D& model, std::string fileName) {
 
 void loadRobot(RobotStructure& robot) {
 	loadModel(robot.robotTorso, "robot_torso.fbx");
+	loadModel(robot.robotHead, "robot_head.fbx");
+	loadModel(robot.robotTorsoJoint, "robot_torso_joint.fbx");
+	loadModel(robot.robotLegsHolder, "robot_legs_holder.fbx");
+	loadModel(robot.robotLeftLeg, "robot_left_leg.fbx");
+	loadModel(robot.robotLeftLeg2, "robot_left_leg2.fbx");
+	loadModel(robot.robotRightLeg, "robot_right_leg.fbx");
+	loadModel(robot.robotRightLeg2, "robot_right_leg2.fbx");
+	loadModel(robot.robotRightFoot, "robot_right_foot.fbx");
+	loadModel(robot.robotLeftFoot, "robot_left_foot.fbx");
+	loadModel(robot.robotLeftArm, "robot_left_arm.fbx");
+	loadModel(robot.robotLeftArm2, "robot_left_arm2.fbx");
+	loadModel(robot.robotRightArm, "robot_right_arm.fbx");
+	loadModel(robot.robotRightArm2, "robot_right_arm2.fbx");
+	loadModel(robot.robotLeftHand, "robot_left_hand.fbx");
+	loadModel(robot.robotRightHand, "robot_right_hand.fbx");
+
+
+	robot.initRobotValues();
 }
 
 //Procedura obsługi błędów
@@ -239,16 +387,20 @@ void error_callback(int error, const char* description) {
 
 void keyCallback(GLFWwindow* window,int key,int scancode,int action,int mods) {
     if (action==GLFW_PRESS) {
-        if (key==GLFW_KEY_LEFT) controlData.speed_x=-PI/2;
-        if (key==GLFW_KEY_RIGHT) controlData.speed_x=PI/2;
-        if (key==GLFW_KEY_UP) controlData.speed_y=PI/2;
-        if (key==GLFW_KEY_DOWN) controlData.speed_y=-PI/2;
+        if (key==GLFW_KEY_LEFT) inputControlData.speed_x=-PI/2;
+        if (key==GLFW_KEY_RIGHT) inputControlData.speed_x=PI/2;
+        if (key==GLFW_KEY_UP) inputControlData.speed_y=PI/2;
+        if (key==GLFW_KEY_DOWN) inputControlData.speed_y=-PI/2;
+		if (key == GLFW_KEY_1) inputControlData.val_speed = -0.5;
+		if (key == GLFW_KEY_2) inputControlData.val_speed = 0.5;
     }
     if (action==GLFW_RELEASE) {
-        if (key==GLFW_KEY_LEFT) controlData.speed_x=0;
-        if (key==GLFW_KEY_RIGHT) controlData.speed_x=0;
-        if (key==GLFW_KEY_UP) controlData.speed_y=0;
-        if (key==GLFW_KEY_DOWN) controlData.speed_y=0;
+        if (key==GLFW_KEY_LEFT) inputControlData.speed_x=0;
+        if (key==GLFW_KEY_RIGHT) inputControlData.speed_x=0;
+        if (key==GLFW_KEY_UP) inputControlData.speed_y=0;
+        if (key==GLFW_KEY_DOWN) inputControlData.speed_y=0;
+		if (key == GLFW_KEY_1) inputControlData.val_speed = 0;
+		if (key == GLFW_KEY_2) inputControlData.val_speed = 0;
     }
 }
 
@@ -283,7 +435,12 @@ void freeOpenGLProgram(GLFWwindow* window) {
     delete sp;
 }
 
+void userInputMove(RobotStructure& robot) {
+	robot.robotTorso.localXYZEulerRotation.x = inputControlData.angle_y;
+	robot.robotTorso.localXYZEulerRotation.z = inputControlData.angle_x;
 
+	std::cout << inputControlData.val << std::endl;
+}
 
 
 //Procedura rysująca zawartość sceny
@@ -292,14 +449,16 @@ void drawScene(GLFWwindow* window, RobotStructure& robot) {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	glm::mat4 V=glm::lookAt(
-         glm::vec3(0, 0, -10),
+         glm::vec3(0, 0, -15),
          glm::vec3(0,0,0),
          glm::vec3(0.0f,1.0f,0.0f)); //Wylicz macierz widoku
 
     glm::mat4 P=glm::perspective(50.0f*PI/180.0f, aspectRatio, 0.01f, 50.0f); //Wylicz macierz rzutowania
     
-	robot.robotMovementLogic(controlData);
-	robot.robotTorso.drawOpenGL(P, V);
+	userInputMove(robot);
+
+	robot.directKinematicsLogic();
+	robot.drawWholeRobot(P, V);
 
     glfwSwapBuffers(window); //Przerzuć tylny bufor na przedni
 }
@@ -335,7 +494,7 @@ int main(void)
 	glfwSetTime(0); //Zeruj timer
 	while (!glfwWindowShouldClose(window)) //Tak długo jak okno nie powinno zostać zamknięte
 	{
-		controlData.updateControlLoop(glfwGetTime());
+		inputControlData.updateControlLoop(glfwGetTime());
         glfwSetTime(0); //Zeruj timer
 		drawScene(window, robotStructure); //Wykonaj procedurę rysującą
 		glfwPollEvents(); //Wykonaj procedury callback w zalezności od zdarzeń jakie zaszły.

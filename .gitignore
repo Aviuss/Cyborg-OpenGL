@@ -361,3 +361,7 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+#custom:
+*/robot_model/*.fbx
+/3d models/robot_model/robot_torso.fbx
