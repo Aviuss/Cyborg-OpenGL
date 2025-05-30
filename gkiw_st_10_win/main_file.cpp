@@ -86,7 +86,6 @@ struct ControlData {
 ControlData inputControlData;
 
 
-
 struct Model3D {
 	float* vertices;
 	float* normals;
@@ -96,6 +95,8 @@ struct Model3D {
 	glm::vec3 localTransform = glm::vec3(0.0f, 0.0f, 0.0f);
 	glm::vec3 localEulerRotation = glm::vec3(0.0f, 0.0f, 0.0f);
 
+
+	GLuint* texture;
 	
 	void printModelToCOUT() {
 		std::cout << "Model3D:\n";
@@ -152,10 +153,7 @@ struct Model3D {
 
 
 		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, tex0);
-
-		glActiveTexture(GL_TEXTURE1);
-		glBindTexture(GL_TEXTURE_2D, tex1);
+		glBindTexture(GL_TEXTURE_2D, *texture);
 
 
 		glDrawArrays(GL_TRIANGLES, 0, vertexCount); //Narysuj obiekt
@@ -191,45 +189,96 @@ struct Model3D {
 struct RobotStructure; // tylko deklaracja
 
 struct RobotJointAngles {
+	// robot position
+	glm::vec3 position = glm::vec3(0, 0, 0);
+	glm::vec3 rotation = glm::vec3(0, 0, 0);
+
 	//torso
-	float head_rot = PI / 7;
-	float torso_rot = PI/10;
+	float head_rot = 0;
+	float torso_rot = 0;
 
 	// left arm
-	float left_shoulder_forward = PI/5;
-	float left_shoulder_side = PI / 4;
-	float left_shoulder_rot = PI / 2;
-	float left_elbow = PI / 2;
-	float left_hand = PI / 3;
+	float left_shoulder_forward = 0;
+	float left_shoulder_side = 0;
+	float left_shoulder_rot = 0;
+	float left_elbow = 0;
+	float left_hand = 0;
 
 	//right arm
-	float right_shoulder_forward = PI / 5;
-	float right_shoulder_side = PI / 4;
+	float right_shoulder_forward = 0;
+	float right_shoulder_side = 0;
 	float right_shoulder_rot = 0;
-	float right_elbow = PI/2;
-	float right_hand = PI / 3;
+	float right_elbow = 0;
+	float right_hand = 0;
 
 	// left leg
-	float left_leg_forward = PI / 4;
-	float left_leg_rot = -PI / 10;
-	float left_leg2_forward = -PI/10;
-	float left_foot = PI/10;
+	float left_leg_forward = 0;
+	float left_leg_rot = 0;
+	float left_leg2_forward = 0;
+	float left_foot = 0;
 
 
 	// right leg
-	float right_leg_forward = -PI / 4;
-	float right_leg_rot = PI / 10;
-	float right_leg2_forward = -PI / 4;
-	float right_foot = -PI / 2;
+	float right_leg_forward = 0;
+	float right_leg_rot = 0;
+	float right_leg2_forward = 0;
+	float right_foot = 0;
 
 	void applyAngles(RobotStructure& robot);
+
+	RobotJointAngles& operator=(const RobotJointAngles& other) {
+		if (this != &other) {
+			std::memcpy(this, &other, sizeof(RobotJointAngles));
+		}
+		return *this;
+	}
+
+	RobotJointAngles() {};
+
+	RobotJointAngles(glm::vec3 _position, glm::vec3 _rotation, float _head_rot, float _torso_rot, float _left_shoulder_forward, float _left_shoulder_side,
+		float _left_shoulder_rot, float _left_elbow, float _left_hand, float _right_shoulder_forward, float _right_shoulder_side,
+		float _right_shoulder_rot, float _right_elbow, float _right_hand, float _left_leg_forward, float _left_leg_rot,
+		float _left_leg2_forward, float _left_foot, float _right_leg_forward, float _right_leg_rot, float _right_leg2_forward,
+		float _right_foot) {
+		position = _position;
+		rotation = _rotation;
+
+		//torso
+		head_rot = _head_rot;
+		torso_rot = _torso_rot;
+
+		// left arm
+		left_shoulder_forward = _left_shoulder_forward;
+		left_shoulder_side = _left_shoulder_side;
+		left_shoulder_rot = _left_shoulder_rot;
+		left_elbow = _left_elbow;
+		left_hand = _left_hand;
+
+		//right arm
+		right_shoulder_forward = _right_shoulder_forward;
+		right_shoulder_side = _right_shoulder_side;
+		right_shoulder_rot = _right_shoulder_rot;
+		right_elbow = _right_elbow;
+		right_hand = _right_hand;
+
+		// left leg
+		left_leg_forward = _left_leg_forward;
+		left_leg_rot = _left_leg_rot;
+		left_leg2_forward = _left_leg2_forward;
+		left_foot = _left_foot;
+
+
+		// right leg
+		right_leg_forward = _right_leg_forward;
+		right_leg_rot = _right_leg_rot;
+		right_leg2_forward = _right_leg2_forward;
+		right_foot = _right_foot;
+
+	}
 };
 
 
 struct RobotStructure {
-	glm::vec3 position = glm::vec3(0,0,0);
-	glm::vec3 rotation = glm::vec3(0, 0, PI);
-
 	Model3D head;
 	Model3D torso;
 	Model3D torsoJoint;
@@ -251,16 +300,16 @@ struct RobotStructure {
 	Model3D rightArm2;
 	Model3D rightHand;
 
-	RobotJointAngles currentPosition;
+	RobotJointAngles currentKeyframe;
 
 
 	void directKinematicsLogic() {
-		currentPosition.applyAngles(*this);
+		currentKeyframe.applyAngles(*this);
 
-		glm::mat4 robotWholeMatrix = glm::translate(glm::mat4(1.0f), position);
-		robotWholeMatrix = glm::rotate(robotWholeMatrix, rotation.x, glm::vec3(1.0f, 0.0f, 0.0f));
-		robotWholeMatrix = glm::rotate(robotWholeMatrix, rotation.y, glm::vec3(0.0f, 1.0f, 0.0f));
-		robotWholeMatrix = glm::rotate(robotWholeMatrix, rotation.z, glm::vec3(0.0f, 0.0f, 1.0f));
+		glm::mat4 robotWholeMatrix = glm::translate(glm::mat4(1.0f), currentKeyframe.position)
+			* glm::rotate(glm::mat4(1.0f), currentKeyframe.rotation.x, glm::vec3(1.0f, 0.0f, 0.0f))
+			* glm::rotate(glm::mat4(1.0f), currentKeyframe.rotation.y, glm::vec3(0.0f, 1.0f, 0.0f))
+			* glm::rotate(glm::mat4(1.0f), currentKeyframe.rotation.z, glm::vec3(0.0f, 0.0f, 1.0f));
 
 		torso.applyTransform(robotWholeMatrix);
 		torso.applyRotation();
@@ -355,6 +404,27 @@ struct RobotStructure {
 		rightArm.localTransform = glm::vec3(2.22455, -0.359883, 0.333555);
 		rightArm2.localTransform = glm::vec3(0.0724277, -0.0241681, -2.04295);
 		rightHand.localTransform = glm::vec3(-0.0832711, 0, -1.66374);
+
+		torso.texture = &tex0;
+		head.texture = &tex0; 
+		torsoJoint.texture = &tex0;
+		legsHolder.texture = &tex0;
+
+		leftLeg.texture = &tex0; 
+		leftLeg2.texture = &tex0;
+		leftFoot.texture = &tex0;
+
+		rightLeg.texture = &tex0;
+		rightLeg2.texture = &tex0;
+		rightFoot.texture = &tex0;
+
+		leftArm.texture = &tex0;
+		leftArm2.texture = &tex0;
+		leftHand.texture = &tex0;
+
+		rightArm.texture = &tex0;
+		rightArm2.texture = &tex0;
+		rightHand.texture = &tex0;
 	}
 };
 
@@ -390,7 +460,8 @@ void RobotJointAngles::applyAngles(RobotStructure &robot) {
 	robot.rightFoot.localEulerRotation.x = -right_foot;
 }
 
-RobotStructure robotStructure;
+RobotStructure mainRobot;
+RobotStructure robotArmy[20];
 Model3D terrain;
 
 void loadModel(Model3D& model, std::string fileName) {
@@ -499,6 +570,18 @@ void windowResizeCallback(GLFWwindow* window,int width,int height) {
     glViewport(0,0,width,height);
 }
 
+
+
+
+
+RobotJointAngles keyframe1(glm::vec3(0,0,3), glm::vec3(0,0,PI), PI / 7, PI / 10, PI / 5, PI / 4, PI / 2, PI / 2, PI / 3, PI / 5, PI / 4, 0, PI / 2, PI / 3,
+	PI / 4, -PI / 10, -PI / 10, PI / 10, -PI / 4, PI / 10, -PI / 4, -PI / 2);
+
+
+
+
+
+
 //Procedura inicjująca
 void initOpenGLProgram(GLFWwindow* window) {
 	//************Tutaj umieszczaj kod, który należy wykonać raz, na początku programu************
@@ -512,8 +595,66 @@ void initOpenGLProgram(GLFWwindow* window) {
 	tex1 = readTexture("sky.png");
 
 
-	loadRobot(robotStructure);
+	loadRobot(mainRobot);
+	mainRobot.currentKeyframe = keyframe1;
+
+	
+	for (int i = 0; i < sizeof(robotArmy) / sizeof(robotArmy[0]); i++) {
+		robotArmy[i].head.vertices = mainRobot.head.vertices;
+		robotArmy[i].head.normals = mainRobot.head.normals;
+		robotArmy[i].head.texCoords = mainRobot.head.texCoords;
+		robotArmy[i].head.vertexCount = mainRobot.head.vertexCount;
+		robotArmy[i].head.texture = mainRobot.head.texture;
+
+		robotArmy[i].torso.vertices = mainRobot.torso.vertices;
+		robotArmy[i].torso.normals = mainRobot.torso.normals;
+		robotArmy[i].torso.texCoords = mainRobot.torso.texCoords;
+		robotArmy[i].torso.vertexCount = mainRobot.torso.vertexCount;
+		robotArmy[i].torso.texture = mainRobot.torso.texture;
+
+		robotArmy[i].leftArm.vertices = mainRobot.leftArm.vertices;
+		robotArmy[i].leftArm.normals = mainRobot.leftArm.normals;
+		robotArmy[i].leftArm.texCoords = mainRobot.leftArm.texCoords;
+		robotArmy[i].leftArm.vertexCount = mainRobot.leftArm.vertexCount;
+		robotArmy[i].leftArm.texture = mainRobot.leftArm.texture;
+
+
+		robotArmy[i].leftLeg.vertices = mainRobot.leftLeg.vertices;
+		robotArmy[i].leftLeg.normals = mainRobot.leftLeg.normals;
+		robotArmy[i].leftLeg.texCoords = mainRobot.leftLeg.texCoords;
+		robotArmy[i].leftLeg.vertexCount = mainRobot.leftLeg.vertexCount;
+		robotArmy[i].leftLeg.texture = mainRobot.leftLeg.texture;
+
+		robotArmy[i].leftLeg2.vertices = mainRobot.leftLeg2.vertices;
+		robotArmy[i].leftLeg2.normals = mainRobot.leftLeg2.normals;
+		robotArmy[i].leftLeg2.texCoords = mainRobot.leftLeg2.texCoords;
+		robotArmy[i].leftLeg2.vertexCount = mainRobot.leftLeg2.vertexCount;
+		robotArmy[i].leftLeg2.texture = mainRobot.leftLeg2.texture;
+
+		robotArmy[i].rightLeg.vertices = mainRobot.rightLeg.vertices;
+		robotArmy[i].rightLeg.normals = mainRobot.rightLeg.normals;
+		robotArmy[i].rightLeg.texCoords = mainRobot.rightLeg.texCoords;
+		robotArmy[i].rightLeg.vertexCount = mainRobot.rightLeg.vertexCount;
+		robotArmy[i].rightLeg.texture = mainRobot.rightLeg.texture;
+					 
+		robotArmy[i].rightLeg2.vertices = mainRobot.rightLeg2.vertices;
+		robotArmy[i].rightLeg2.normals = mainRobot.rightLeg2.normals;
+		robotArmy[i].rightLeg2.texCoords = mainRobot.rightLeg2.texCoords;
+		robotArmy[i].rightLeg2.vertexCount = mainRobot.rightLeg2.vertexCount;
+		robotArmy[i].rightLeg2.texture = mainRobot.rightLeg2.texture;
+
+
+		robotArmy[i].initRobotValues();
+		
+		int row = i / 5;
+		int col = i % 5;
+		robotArmy[i].currentKeyframe.position = glm::vec3(row*10-10, col*10 + 30, -35);
+	}
+
 	loadModel(terrain, "terrain.fbx");
+	terrain.texture = &tex1;
+
+
 }
 
 
@@ -525,11 +666,12 @@ void freeOpenGLProgram(GLFWwindow* window) {
 }
 
 void userInputMove(RobotStructure& robot) {
-	robot.torso.localEulerRotation.x = inputControlData.angle_y;
-	robot.torso.localEulerRotation.z = inputControlData.angle_x;
+	//robot.torso.localEulerRotation.x = inputControlData.angle_y;
+	//robot.torso.localEulerRotation.z = inputControlData.angle_x;
 
-	std::cout << inputControlData.val << std::endl;
-	robot.position.y = -20*inputControlData.val;
+	std::cout << inputControlData.angle_x << std::endl;
+	robot.currentKeyframe.position.y = -20*inputControlData.val;
+	robot.currentKeyframe.position.z = inputControlData.angle_x;
 }
 
 
@@ -540,11 +682,15 @@ void drawScene(GLFWwindow* window, RobotStructure& robot) {
 
 
 	userInputMove(robot);
+	
 	robot.directKinematicsLogic();
+	for (int i = 0; i < sizeof(robotArmy) / sizeof(robotArmy[0]); i++) {
+		robotArmy[i].directKinematicsLogic();
+	}
 
 	glm::mat4 V=glm::lookAt(
-         glm::vec3(0, 20+robot.position.y, 15),
-         robot.position,
+         glm::vec3(0, 20+robot.currentKeyframe.position.y, 15),
+         robot.currentKeyframe.position,
          glm::vec3(0.0f,-1.0f,0.0f)); //Wylicz macierz widoku
 
     glm::mat4 P=glm::perspective(50.0f*PI/180.0f, aspectRatio, 0.01f, 500.0f); //Wylicz macierz rzutowania
@@ -552,6 +698,16 @@ void drawScene(GLFWwindow* window, RobotStructure& robot) {
 
 	terrain.drawOpenGL(P, V);
 	robot.drawWholeRobot(P, V);
+
+	for (int i = 0; i < sizeof(robotArmy) / sizeof(robotArmy[0]); i++) {
+		robotArmy[i].head.drawOpenGL(P, V);
+		robotArmy[i].torso.drawOpenGL(P, V);
+		robotArmy[i].leftArm.drawOpenGL(P, V);
+		robotArmy[i].leftLeg.drawOpenGL(P, V);
+		robotArmy[i].leftLeg2.drawOpenGL(P, V);
+		robotArmy[i].rightLeg.drawOpenGL(P, V);
+		robotArmy[i].rightLeg2.drawOpenGL(P, V);
+	}
 
     glfwSwapBuffers(window); //Przerzuć tylny bufor na przedni
 }
@@ -589,7 +745,7 @@ int main(void)
 	{
 		inputControlData.updateControlLoop(glfwGetTime());
         glfwSetTime(0); //Zeruj timer
-		drawScene(window, robotStructure); //Wykonaj procedurę rysującą
+		drawScene(window, mainRobot); //Wykonaj procedurę rysującą
 		glfwPollEvents(); //Wykonaj procedury callback w zalezności od zdarzeń jakie zaszły.
 	}
 
