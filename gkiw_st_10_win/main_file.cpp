@@ -41,10 +41,33 @@ Place, Fifth Floor, Boston, MA  02110 - 1301  USA
 
 float aspectRatio=1;
 
+float timeDelta;
+
 ShaderProgram *sp;
 
 GLuint tex0;
 GLuint tex1;
+
+enum whichStep { // dla uzytku ruszajacego sie robota
+	LEFT_LEG_FORWARD,
+	LEFT_LEG_BACKWARD,
+	RIGHT_LEG_FORWARD,
+	RIGHT_LEG_BACKWARD
+};
+
+enum direction {
+	NONE,
+	FORWARD,
+	BACKWARD
+};
+
+enum walkingAnimation {
+	BEND_KNEE,
+	LEG_FORWARD,
+	LEG_BACKWARD,
+	PUT_LEG,
+	STEP
+};
 
 GLuint readTexture(const char* filename) {
 	GLuint tex;
@@ -70,18 +93,29 @@ struct ControlData {
 	float angle_x = 0;
 	float angle_y = 0;
 	float val = 0;
-
+	float rot_angle = 0;
+	float zoom = 0;
+	float maxSwing = PI / 6;
+	float stepDelta = PI/5;
+	float moveSpeed = 0.75f;
+	float lerpPosition = 1.0f;
 
 	void updateControlLoop(float deltaTime) {
 		angle_x += speed_x * deltaTime; //Zwiększ/zmniejsz kąt obrotu na podstawie prędkości i czasu jaki upłynał od poprzedniej klatki
 		angle_y += speed_y * deltaTime; //Zwiększ/zmniejsz kąt obrotu na podstawie prędkości i czasu jaki upłynał od poprzedniej klatki
 		val += val_speed * deltaTime;
+		rot_angle += rot_speed * deltaTime;
+		zoom += zoom_speed * deltaTime;
+		stepDelta = PI/5 * deltaTime;
+		lerpPosition += deltaTime/moveSpeed;
+		if (lerpPosition > 1.0f) lerpPosition = 1.0f;
 	}
 
 	float speed_x = 0;
 	float speed_y = 0;
-
+	float rot_speed = 0;
 	float val_speed = 0;
+	float zoom_speed = 0;
 };
 ControlData inputControlData;
 
@@ -192,6 +226,8 @@ struct RobotJointAngles {
 	// robot position
 	glm::vec3 position = glm::vec3(0, 0, 0);
 	glm::vec3 rotation = glm::vec3(0, 0, 0);
+	glm::vec3 targetPosition = glm::vec3(0, 0, 0); //docelowa pozycja po ruchu
+	float positionLerpProgress = 0.0f; //zmienna do interpolacji pozycji
 
 	//torso
 	float head_rot = 0;
@@ -277,7 +313,6 @@ struct RobotJointAngles {
 	}
 };
 
-
 struct RobotStructure {
 	Model3D head;
 	Model3D torso;
@@ -302,6 +337,11 @@ struct RobotStructure {
 
 	RobotJointAngles currentKeyframe;
 
+	bool isMarching = false;
+
+	whichStep step = LEFT_LEG_FORWARD;
+	direction direction = NONE;
+	walkingAnimation walkingPhase = BEND_KNEE;
 
 	void directKinematicsLogic() {
 		currentKeyframe.applyAngles(*this);
@@ -425,6 +465,58 @@ struct RobotStructure {
 		rightArm.texture = &tex0;
 		rightArm2.texture = &tex0;
 		rightHand.texture = &tex0;
+
+		isMarching = false;
+		step = LEFT_LEG_FORWARD;
+		direction = NONE;
+		walkingPhase = BEND_KNEE;
+	}
+
+	void changeKeyframe(RobotStructure &robot, RobotJointAngles newKeyframe) {
+		robot.currentKeyframe = newKeyframe;
+	}
+
+	void finalizeMovementIfDone(RobotStructure& robot) {
+		if (inputControlData.lerpPosition >= 1.0f) {
+			inputControlData.lerpPosition = 1.0f;
+			robot.currentKeyframe.position = robot.currentKeyframe.targetPosition;
+		}
+	}
+
+	void changePosition(RobotStructure& robot) {
+		robot.currentKeyframe.position = glm::mix(
+			robot.currentKeyframe.position,
+			robot.currentKeyframe.targetPosition,
+			inputControlData.lerpPosition
+		);
+		finalizeMovementIfDone(robot);
+	}
+
+	void moveOneStep(RobotStructure& robot, float stepLength) {  
+		robot.currentKeyframe.targetPosition = robot.currentKeyframe.position + glm::vec3(0.0f, stepLength, 0.0f); //trzeba dopasowac to do rotacji - poki co ruszamy sie tylko po y
+		inputControlData.lerpPosition = 0.0f;
+		changePosition(robot);
+	}
+
+	void incrementWalkingPhase(RobotStructure& robot) {
+		switch (robot.walkingPhase) {
+		case BEND_KNEE:
+			robot.walkingPhase = LEG_FORWARD;
+			break;
+		case LEG_FORWARD:
+			robot.walkingPhase = LEG_BACKWARD;
+			break;
+		case LEG_BACKWARD:
+			robot.walkingPhase = PUT_LEG;
+			break;
+		case PUT_LEG:
+			robot.walkingPhase = STEP;
+			break;
+		case STEP:
+			robot.walkingPhase = BEND_KNEE;
+		default:
+			robot.walkingPhase = BEND_KNEE;
+		}
 	}
 };
 
@@ -458,6 +550,139 @@ void RobotJointAngles::applyAngles(RobotStructure &robot) {
 	robot.rightLeg.localEulerRotation.z = right_leg_rot;
 	robot.rightLeg2.localEulerRotation.x = -right_leg2_forward;
 	robot.rightFoot.localEulerRotation.x = -right_foot;
+}
+
+void moveLimbsMarch(RobotStructure& robot, RobotJointAngles& keyframe) {
+	float maxSwing = inputControlData.maxSwing;
+	float stepDelta = inputControlData.stepDelta;
+
+	if (robot.step == LEFT_LEG_FORWARD) {
+		if (keyframe.left_leg_forward < maxSwing) {
+			keyframe.left_leg_forward += stepDelta;
+			keyframe.right_shoulder_forward += stepDelta;
+		}
+		else {
+			robot.step = LEFT_LEG_BACKWARD;
+		}
+	}
+	else if (robot.step == LEFT_LEG_BACKWARD) {
+		if (keyframe.left_leg_forward > 0) {
+			keyframe.left_leg_forward -= stepDelta;
+			keyframe.right_shoulder_forward -= stepDelta;
+		}
+		else {
+			robot.step = RIGHT_LEG_FORWARD;
+			robot.moveOneStep(robot, 1.0f);
+		}
+	}
+	else if (robot.step == RIGHT_LEG_FORWARD) {
+		if (keyframe.right_leg_forward < maxSwing) {
+			keyframe.right_leg_forward += stepDelta;
+			keyframe.left_shoulder_forward += stepDelta;
+		}
+		else {
+			robot.step = RIGHT_LEG_BACKWARD;
+		}
+	}
+	else {
+		if (keyframe.right_leg_forward > 0) {
+			keyframe.right_leg_forward -= stepDelta;
+			keyframe.left_shoulder_forward -= stepDelta;
+		}
+		else {
+			robot.step = LEFT_LEG_FORWARD;
+			robot.moveOneStep(robot, 1.0f);
+		}
+	}
+
+	robot.changeKeyframe(robot, keyframe);
+	robot.changePosition(robot);
+}
+
+void marchForward(RobotStructure& robot, RobotJointAngles& keyframe) {
+	moveLimbsMarch(robot, keyframe);
+}
+
+void forwardStepAnimation(RobotStructure& robot, RobotJointAngles& keyframe) {
+	float maxSwing = inputControlData.maxSwing + PI/12;
+	float stepDelta = inputControlData.stepDelta + PI/45;
+	RobotJointAngles newKeyframe;
+
+	if (robot.step == LEFT_LEG_FORWARD) {
+		if (robot.walkingPhase == BEND_KNEE) {
+			keyframe.left_leg2_forward -= stepDelta;
+			keyframe.left_foot += stepDelta;
+			if (keyframe.left_leg2_forward <= -maxSwing) robot.incrementWalkingPhase(robot);
+			printf("lewa noga bend_knee\n");
+		}
+		else if (robot.walkingPhase == LEG_FORWARD) {
+			keyframe.left_leg_forward += stepDelta;
+			keyframe.left_foot -= stepDelta;
+			if (keyframe.left_leg_forward >= maxSwing) robot.incrementWalkingPhase(robot);
+			printf("lewa noga leg_forward\n");
+		}
+		else if (robot.walkingPhase == LEG_BACKWARD) {
+			keyframe.right_leg_forward -= stepDelta;
+			keyframe.right_foot += stepDelta;
+			if (keyframe.right_leg_forward <= -maxSwing / 2) robot.incrementWalkingPhase(robot);
+			printf("lewa noga leg_backward\n");
+		}
+		else if (robot.walkingPhase == PUT_LEG) {
+			keyframe.left_leg2_forward += stepDelta;
+			keyframe.left_leg_forward -= stepDelta;
+			robot.moveOneStep(robot, 5.0f/(maxSwing/stepDelta));
+			if (keyframe.right_leg_forward <= 0) {
+				keyframe.right_leg_forward += stepDelta;
+				keyframe.right_foot -= stepDelta;
+			}
+			if (keyframe.left_leg2_forward >= 0) robot.incrementWalkingPhase(robot);
+			printf("lewa noga put_leg\n");
+		}
+		else {
+			robot.step = RIGHT_LEG_FORWARD;
+			robot.incrementWalkingPhase(robot);
+		}
+		//kolano -> miednica -> kolano sie prostuje -> pochylam sie na noge -> dosuwam cialo do nogi
+	}
+	else if (robot.step == RIGHT_LEG_FORWARD) {
+		if (robot.walkingPhase == BEND_KNEE) {
+			keyframe.right_leg2_forward -= stepDelta;
+			keyframe.right_foot += stepDelta;
+			if (keyframe.right_leg2_forward <= -maxSwing) robot.incrementWalkingPhase(robot);
+			printf("prawa noga bend_knee\n");
+		}
+		else if (robot.walkingPhase == LEG_FORWARD) {
+			keyframe.right_leg_forward += stepDelta;
+			keyframe.right_foot -= stepDelta;
+			if (keyframe.right_leg_forward >= maxSwing) robot.incrementWalkingPhase(robot);
+			printf("prawa noga leg_forward\n");
+		}
+		else if (robot.walkingPhase == LEG_BACKWARD) {
+			keyframe.left_leg_forward -= stepDelta;
+			keyframe.left_foot += stepDelta;
+			if (keyframe.left_leg_forward <= -maxSwing / 2) robot.incrementWalkingPhase(robot);
+			printf("prawa noga leg_backward\n");
+		}
+		else if (robot.walkingPhase == PUT_LEG) {
+			keyframe.right_leg2_forward += stepDelta;
+			keyframe.right_leg_forward -= stepDelta;
+			robot.moveOneStep(robot, 5.0f / (maxSwing / stepDelta));
+			if (keyframe.left_leg_forward <= 0) {
+				keyframe.left_leg_forward += stepDelta;
+				keyframe.left_foot -= stepDelta;
+			}
+			if (keyframe.right_leg2_forward >= 0) robot.incrementWalkingPhase(robot);
+			printf("prawa noga put_leg\n");
+		}
+		else {
+			robot.step = LEFT_LEG_FORWARD;
+			robot.incrementWalkingPhase(robot);
+		}
+	}
+
+	newKeyframe = keyframe;
+	robot.changeKeyframe(robot, newKeyframe);
+	robot.changePosition(robot);
 }
 
 RobotStructure mainRobot;
@@ -544,7 +769,6 @@ void error_callback(int error, const char* description) {
 	fputs(description, stderr);
 }
 
-
 void keyCallback(GLFWwindow* window,int key,int scancode,int action,int mods) {
     if (action==GLFW_PRESS) {
         if (key==GLFW_KEY_LEFT) inputControlData.speed_x=-PI/2;
@@ -553,6 +777,13 @@ void keyCallback(GLFWwindow* window,int key,int scancode,int action,int mods) {
         if (key==GLFW_KEY_DOWN) inputControlData.speed_y=-PI/2;
 		if (key == GLFW_KEY_1) inputControlData.val_speed = -0.5;
 		if (key == GLFW_KEY_2) inputControlData.val_speed = 0.5;
+		if (key == GLFW_KEY_E) inputControlData.rot_speed = PI;
+		if (key == GLFW_KEY_Q) inputControlData.rot_speed = -PI;
+		if (key == GLFW_KEY_4) inputControlData.zoom_speed = PI;
+		if (key == GLFW_KEY_5) inputControlData.zoom_speed = -PI;
+		if (key == GLFW_KEY_W) mainRobot.direction = FORWARD;
+		if (key == GLFW_KEY_S) mainRobot.direction = BACKWARD;
+		if (key == GLFW_KEY_3) mainRobot.isMarching = true;
     }
     if (action==GLFW_RELEASE) {
         if (key==GLFW_KEY_LEFT) inputControlData.speed_x=0;
@@ -561,6 +792,12 @@ void keyCallback(GLFWwindow* window,int key,int scancode,int action,int mods) {
         if (key==GLFW_KEY_DOWN) inputControlData.speed_y=0;
 		if (key == GLFW_KEY_1) inputControlData.val_speed = 0;
 		if (key == GLFW_KEY_2) inputControlData.val_speed = 0;
+		if (key == GLFW_KEY_Q) inputControlData.rot_speed = 0;
+		if (key == GLFW_KEY_E) inputControlData.rot_speed = 0;
+		if (key == GLFW_KEY_4) inputControlData.zoom_speed = 0;
+		if (key == GLFW_KEY_5) inputControlData.zoom_speed = 0;
+		if (key == GLFW_KEY_W) mainRobot.direction = NONE;
+		if (key == GLFW_KEY_S) mainRobot.direction = NONE;
     }
 }
 
@@ -571,15 +808,10 @@ void windowResizeCallback(GLFWwindow* window,int width,int height) {
 }
 
 
-
-
-
-RobotJointAngles keyframe1(glm::vec3(0,0,3), glm::vec3(0,0,PI), PI / 7, PI / 10, PI / 5, PI / 4, PI / 2, PI / 2, PI / 3, PI / 5, PI / 4, 0, PI / 2, PI / 3,
+RobotJointAngles keyframe0(glm::vec3(0,0,3), glm::vec3(0,0,PI), PI / 7, PI / 10, PI / 5, PI / 4, PI / 2, PI / 2, PI / 3, PI / 5, PI / 4, 0, PI / 2, PI / 3,
 	PI / 4, -PI / 10, -PI / 10, PI / 10, -PI / 4, PI / 10, -PI / 4, -PI / 2);
 
-
-
-
+RobotJointAngles keyframe1(glm::vec3(0, 0, 3), glm::vec3(0, 0, PI), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
 
 //Procedura inicjująca
@@ -653,8 +885,6 @@ void initOpenGLProgram(GLFWwindow* window) {
 
 	loadModel(terrain, "terrain.fbx");
 	terrain.texture = &tex1;
-
-
 }
 
 
@@ -670,8 +900,13 @@ void userInputMove(RobotStructure& robot) {
 	//robot.torso.localEulerRotation.z = inputControlData.angle_x;
 
 	std::cout << inputControlData.angle_x << std::endl;
-	robot.currentKeyframe.position.y = -20*inputControlData.val;
+	std::cout << robot.currentKeyframe.position.y << " , " << robot.currentKeyframe.targetPosition.y << std::endl;
+	//robot.currentKeyframe.position.y = -20*inputControlData.val;
 	robot.currentKeyframe.position.z = inputControlData.angle_x;
+	//robot.currentKeyframe.targetPosition = robot.currentKeyframe.position;
+
+	if (robot.isMarching) marchForward(robot, robot.currentKeyframe);
+	if (robot.direction == FORWARD)  forwardStepAnimation( robot, robot.currentKeyframe);
 }
 
 
@@ -680,7 +915,7 @@ void drawScene(GLFWwindow* window, RobotStructure& robot) {
 	//************Tutaj umieszczaj kod rysujący obraz******************l
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-
+	const int radius = 23 - inputControlData.zoom;
 	userInputMove(robot);
 	
 	robot.directKinematicsLogic();
@@ -689,9 +924,9 @@ void drawScene(GLFWwindow* window, RobotStructure& robot) {
 	}
 
 	glm::mat4 V=glm::lookAt(
-         glm::vec3(0, 20+robot.currentKeyframe.position.y, 15),
+         glm::vec3(cos(inputControlData.rot_angle) * radius, robot.currentKeyframe.position.y+sin(inputControlData.rot_angle) * radius, robot.currentKeyframe.position.z),
          robot.currentKeyframe.position,
-         glm::vec3(0.0f,-1.0f,0.0f)); //Wylicz macierz widoku
+         glm::vec3(0.0f,0.0f,1.0f)); //Wylicz macierz widoku
 
     glm::mat4 P=glm::perspective(50.0f*PI/180.0f, aspectRatio, 0.01f, 500.0f); //Wylicz macierz rzutowania
     
