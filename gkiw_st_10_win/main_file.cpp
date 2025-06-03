@@ -938,13 +938,15 @@ RobotStructure mainRobot;
 RobotStructure robotArmy[20];
 Model3D terrain;
 
+
 void loadModel(Model3D& model, std::string fileName) {
 
 	Assimp::Importer importer;
 	const aiScene* scene = importer.ReadFile(fileName,
 		aiProcess_Triangulate |
 		aiProcess_FlipUVs |
-		aiProcess_CalcTangentSpace);
+		aiProcess_CalcTangentSpace |
+		aiProcess_GenSmoothNormals);
 
 	if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
 		std::cerr << "ERROR::ASSIMP::" << importer.GetErrorString() << std::endl;
@@ -954,8 +956,8 @@ void loadModel(Model3D& model, std::string fileName) {
 	std::vector<float> vertices_local;
 	std::vector<float> normals_local;
 	std::vector<float> texCoords_local;
-	
-	for (int meshId = 0; meshId < scene->mNumMeshes; meshId ++) {
+
+	for (int meshId = 0; meshId < scene->mNumMeshes; meshId++) {
 		aiMesh* mesh = scene->mMeshes[meshId];
 
 		for (unsigned int i = 0; i < mesh->mNumVertices; i++) {
@@ -977,7 +979,7 @@ void loadModel(Model3D& model, std::string fileName) {
 
 	}
 
-	
+
 	model.vertices = new float[vertices_local.size()];
 	std::copy(vertices_local.begin(), vertices_local.end(), model.vertices);
 
@@ -987,7 +989,7 @@ void loadModel(Model3D& model, std::string fileName) {
 	model.texCoords = new float[texCoords_local.size()];
 	std::copy(texCoords_local.begin(), texCoords_local.end(), model.texCoords);
 
-	model.vertexCount = vertices_local.size()/4;
+	model.vertexCount = vertices_local.size() / 4;
 	return;
 }
 
