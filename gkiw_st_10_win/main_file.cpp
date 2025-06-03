@@ -45,6 +45,12 @@ ShaderProgram *sp;
 
 GLuint tex0;
 GLuint tex1;
+GLuint tex2;
+GLuint tex3;
+GLuint tex4;
+GLuint tex5;
+
+float* fshift = new float[1];
 
 enum whichStep { // dla uzytku ruszajacego sie robota
 	LEFT_LEG_FORWARD,
@@ -168,7 +174,9 @@ struct Model3D {
 	glm::vec3 localEulerRotation = glm::vec3(0.0f, 0.0f, 0.0f);
 
 
-	GLuint* texture;
+	GLuint* texture_diff = nullptr;
+	GLuint* texture_metal = nullptr;
+	GLuint* texture_mask = nullptr;
 	
 	void printModelToCOUT() {
 		std::cout << "Model3D:\n";
@@ -202,16 +210,32 @@ struct Model3D {
 
 	void drawOpenGL(glm::mat4& P, glm::mat4& V) {
 
-		sp->use();//Aktywacja programu cieniującego
+		sp->use();//Aktywacja programu cieniującego	
 		//Przeslij parametry programu cieniującego do karty graficznej
 		glUniformMatrix4fv(sp->u("P"), 1, false, glm::value_ptr(P));
 		glUniformMatrix4fv(sp->u("V"), 1, false, glm::value_ptr(V));
 		glUniformMatrix4fv(sp->u("M"), 1, false, glm::value_ptr(localMatrix));
-		glUniform4f(sp->u("lp"), 0, 0, -6, 1);
-		glUniform1i(sp->u("textureMap0"), 0); //drawScene
+		glUniform4f(sp->u("lp1"), 0, 100, 20, 1);
+		glUniform4f(sp->u("lp2"), -40, 0, 15, 1);
+		glUniform1f(sp->u("fshift"), *fshift);
+
+		if (texture_diff != nullptr) {
+			glUniform1i(sp->u("textureMap0"), 0); //drawScene
+		}
+		if (texture_metal != nullptr) {
+			glUniform1i(sp->u("textureMap1"), 1); //drawScene
+		}
+		if (texture_mask != nullptr) {
+			glUniform1i(sp->u("textureMap2"), 2); //drawScene
+		}
+
 
 		glEnableVertexAttribArray(sp->a("vertex"));  //Włącz przesyłanie danych do atrybutu vertex
 		glVertexAttribPointer(sp->a("vertex"), 4, GL_FLOAT, false, 0, vertices); //Wskaż tablicę z danymi dla atrybutu vertex
+
+		//glEnableVertexAttribArray(sp->a("fshift"));  //Włącz przesyłanie danych do atrybutu vertex
+		//glVertexAttribPointer(sp->a("fshift"), 1, GL_FLOAT, false, 0, fshift); //Wskaż tablicę z danymi dla atrybutu vertex
+
 
 		//glEnableVertexAttribArray(sp->a("color"));  //Włącz przesyłanie danych do atrybutu color
 		//glVertexAttribPointer(sp->a("color"), 4, GL_FLOAT, false, 0, colors); //Wskaż tablicę z danymi dla atrybutu color
@@ -224,8 +248,18 @@ struct Model3D {
 			2, GL_FLOAT, false, 0, texCoords);//odpowiednia tablica
 
 
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, *texture);
+		if (texture_diff != nullptr) {
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, *texture_diff);
+		}
+		if (texture_metal != nullptr) {
+			glActiveTexture(GL_TEXTURE1);
+			glBindTexture(GL_TEXTURE_2D, *texture_metal);
+		}
+		if (texture_mask != nullptr) {
+			glActiveTexture(GL_TEXTURE2);
+			glBindTexture(GL_TEXTURE_2D, *texture_mask);
+		}
 
 
 		glDrawArrays(GL_TRIANGLES, 0, vertexCount); //Narysuj obiekt
@@ -234,6 +268,8 @@ struct Model3D {
 		//glDisableVertexAttribArray(sp->a("color"));  //Wyłącz przesyłanie danych do atrybutu color
 		glDisableVertexAttribArray(sp->a("normal"));  //Wyłącz przesyłanie danych do atrybutu normal
 		glDisableVertexAttribArray(sp->a("texCoord0"));
+		//glDisableVertexAttribArray(sp->a("fshift"));  //Włącz przesyłanie danych do atrybutu vertex
+
 
 	}
 
@@ -256,6 +292,13 @@ struct Model3D {
 			}
 		}
 	}
+
+	void setTextures(GLuint* _texture_diff, GLuint* _texture_metal, GLuint* _texture_mask) {
+		texture_diff = _texture_diff;
+		texture_metal = _texture_metal;
+		texture_mask = _texture_mask;
+	}
+
 };
 
 struct RobotStructure; // tylko deklaracja
@@ -376,6 +419,11 @@ struct RobotStructure {
 
 	RobotJointAngles currentKeyframe;
 
+
+	GLuint* texture_diff = nullptr;
+	GLuint* texture_metal = nullptr;
+	GLuint* texture_mask = nullptr;
+
 	bool isMarching = false;
 	bool isMarchingAnimationFinished = true;
 	bool isForwardAnimationFinished = true;
@@ -469,58 +517,6 @@ struct RobotStructure {
 		rightHand.drawOpenGL(P, V);
 	}
 
-	inline void initRobotValues() {
-		torso.localTransform = glm::vec3(0, 0, 5);
-		head.localTransform = glm::vec3(0, 0, 1.46724);
-		torsoJoint.localTransform = glm::vec3(0.0f, 0.0f, -1.0f);
-		legsHolder.localTransform = glm::vec3(0.0f, 0.0f, -2.0f);
-
-		leftLeg.localTransform = glm::vec3(-0.699591, 0.0f, -0.366832);
-		leftLeg2.localTransform = glm::vec3(-0.28473, 0.0f, -1.58215);
-		leftFoot.localTransform = glm::vec3(0.30515, 0, -2.29);
-
-		rightLeg.localTransform = glm::vec3(0.699591, 0.0f, -0.366832);
-		rightLeg2.localTransform = glm::vec3(0.28473, 0.0f, -1.58215);
-		rightFoot.localTransform = glm::vec3(-0.30515, 0, -2.29);
-
-		leftArm.localTransform = glm::vec3(-2.22455, -0.359883, 0.333555);
-		leftArm2.localTransform = glm::vec3(-0.0724277, -0.0241681, -2.04295);
-		leftHand.localTransform = glm::vec3(0.0832711, 0, -1.66374);
-
-		rightArm.localTransform = glm::vec3(2.22455, -0.359883, 0.333555);
-		rightArm2.localTransform = glm::vec3(0.0724277, -0.0241681, -2.04295);
-		rightHand.localTransform = glm::vec3(-0.0832711, 0, -1.66374);
-
-		torso.texture = &tex0;
-		head.texture = &tex0; 
-		torsoJoint.texture = &tex0;
-		legsHolder.texture = &tex0;
-
-		leftLeg.texture = &tex0; 
-		leftLeg2.texture = &tex0;
-		leftFoot.texture = &tex0;
-
-		rightLeg.texture = &tex0;
-		rightLeg2.texture = &tex0;
-		rightFoot.texture = &tex0;
-
-		leftArm.texture = &tex0;
-		leftArm2.texture = &tex0;
-		leftHand.texture = &tex0;
-
-		rightArm.texture = &tex0;
-		rightArm2.texture = &tex0;
-		rightHand.texture = &tex0;
-
-		isMarching = false;
-		step = LEFT_LEG_FORWARD;
-		direction = NONE;
-		walkingPhase = BEND_KNEE;
-		backwardPhase = LEGS_SPLIT;
-		turningPhase = LEG_UP;
-		control = MANUAL;
-	}
-
 	void changeKeyframe(RobotStructure &robot, RobotJointAngles newKeyframe) {
 		robot.currentKeyframe = newKeyframe;
 	}
@@ -600,6 +596,51 @@ struct RobotStructure {
 
 		robot.changeKeyframe(robot, newKeyframe);
 	}
+
+	inline void initRobotValues() {
+		torso.localTransform = glm::vec3(0, 0, 5);
+		head.localTransform = glm::vec3(0, 0, 1.46724);
+		torsoJoint.localTransform = glm::vec3(0.0f, 0.0f, -1.0f);
+		legsHolder.localTransform = glm::vec3(0.0f, 0.0f, -2.0f);
+
+		leftLeg.localTransform = glm::vec3(-0.699591, 0.0f, -0.366832);
+		leftLeg2.localTransform = glm::vec3(-0.28473, 0.0f, -1.58215);
+		leftFoot.localTransform = glm::vec3(0.30515, 0, -2.29);
+
+		rightLeg.localTransform = glm::vec3(0.699591, 0.0f, -0.366832);
+		rightLeg2.localTransform = glm::vec3(0.28473, 0.0f, -1.58215);
+		rightFoot.localTransform = glm::vec3(-0.30515, 0, -2.29);
+
+		leftArm.localTransform = glm::vec3(-2.22455, -0.359883, 0.333555);
+		leftArm2.localTransform = glm::vec3(-0.0724277, -0.0241681, -2.04295);
+		leftHand.localTransform = glm::vec3(0.0832711, 0, -1.66374);
+
+		rightArm.localTransform = glm::vec3(2.22455, -0.359883, 0.333555);
+		rightArm2.localTransform = glm::vec3(0.0724277, -0.0241681, -2.04295);
+		rightHand.localTransform = glm::vec3(-0.0832711, 0, -1.66374);
+
+		torso.setTextures(texture_diff, texture_metal, texture_mask);
+		head.setTextures(texture_diff, texture_metal, texture_mask);
+		torsoJoint.setTextures(texture_diff, texture_metal, texture_mask);
+		legsHolder.setTextures(texture_diff, texture_metal, texture_mask);
+
+		leftLeg.setTextures(texture_diff, texture_metal, texture_mask);
+		leftLeg2.setTextures(texture_diff, texture_metal, texture_mask);
+		leftFoot.setTextures(texture_diff, texture_metal, texture_mask);
+
+		rightLeg.setTextures(texture_diff, texture_metal, texture_mask);
+		rightLeg2.setTextures(texture_diff, texture_metal, texture_mask);
+		rightFoot.setTextures(texture_diff, texture_metal, texture_mask);
+
+		leftArm.setTextures(texture_diff, texture_metal, texture_mask);
+		leftArm2.setTextures(texture_diff, texture_metal, texture_mask);
+		leftHand.setTextures(texture_diff, texture_metal, texture_mask);
+
+		rightArm.setTextures(texture_diff, texture_metal, texture_mask);
+		rightArm2.setTextures(texture_diff, texture_metal, texture_mask);
+		rightHand.setTextures(texture_diff, texture_metal, texture_mask);
+	}
+
 };
 
 void RobotJointAngles::applyAngles(RobotStructure &robot) {
@@ -1073,68 +1114,80 @@ void initOpenGLProgram(GLFWwindow* window) {
 	glfwSetKeyCallback(window,keyCallback);
 
 	sp=new ShaderProgram("v_simplest.glsl",NULL,"f_simplest.glsl");
-	tex0 = readTexture("red_brick_diff_4k.png");
-	tex1 = readTexture("sky.png");
+	tex0 = readTexture("rusty_metal_04_diff_4k.png");
+	tex1 = readTexture("rusty_metal_04_metal_4k.png");
+	tex2 = readTexture("green effect mask.png");
+	tex3 = readTexture("TerrazzoSlab028/TerrazzoSlab028_COL_2K_METALNESS.png");
+	tex4 = readTexture("TerrazzoSlab028/TerrazzoSlab028_ROUGHNESS_2K_METALNESS.png");
+	tex5 = readTexture("black_pixel.png");
 
 
-	loadRobot(mainRobot);
+
+
 	mainRobot.currentKeyframe = keyframe1;
+	mainRobot.texture_diff = &tex0;
+	mainRobot.texture_metal = &tex1;
+	mainRobot.texture_mask = &tex2;
+	loadRobot(mainRobot);
 
-	
 	for (int i = 0; i < sizeof(robotArmy) / sizeof(robotArmy[0]); i++) {
 		robotArmy[i].head.vertices = mainRobot.head.vertices;
 		robotArmy[i].head.normals = mainRobot.head.normals;
 		robotArmy[i].head.texCoords = mainRobot.head.texCoords;
 		robotArmy[i].head.vertexCount = mainRobot.head.vertexCount;
-		robotArmy[i].head.texture = mainRobot.head.texture;
+		robotArmy[i].head.setTextures(mainRobot.head.texture_diff, mainRobot.head.texture_metal, mainRobot.head.texture_mask);
 
 		robotArmy[i].torso.vertices = mainRobot.torso.vertices;
 		robotArmy[i].torso.normals = mainRobot.torso.normals;
 		robotArmy[i].torso.texCoords = mainRobot.torso.texCoords;
 		robotArmy[i].torso.vertexCount = mainRobot.torso.vertexCount;
-		robotArmy[i].torso.texture = mainRobot.torso.texture;
+		robotArmy[i].torso.setTextures(mainRobot.torso.texture_diff, mainRobot.torso.texture_metal, mainRobot.torso.texture_mask);
 
 		robotArmy[i].leftArm.vertices = mainRobot.leftArm.vertices;
 		robotArmy[i].leftArm.normals = mainRobot.leftArm.normals;
 		robotArmy[i].leftArm.texCoords = mainRobot.leftArm.texCoords;
 		robotArmy[i].leftArm.vertexCount = mainRobot.leftArm.vertexCount;
-		robotArmy[i].leftArm.texture = mainRobot.leftArm.texture;
+		robotArmy[i].leftArm.setTextures(mainRobot.leftArm.texture_diff, mainRobot.leftArm.texture_metal, mainRobot.leftArm.texture_mask);
 
 
 		robotArmy[i].leftLeg.vertices = mainRobot.leftLeg.vertices;
 		robotArmy[i].leftLeg.normals = mainRobot.leftLeg.normals;
 		robotArmy[i].leftLeg.texCoords = mainRobot.leftLeg.texCoords;
 		robotArmy[i].leftLeg.vertexCount = mainRobot.leftLeg.vertexCount;
-		robotArmy[i].leftLeg.texture = mainRobot.leftLeg.texture;
+		robotArmy[i].leftLeg.setTextures(mainRobot.leftLeg.texture_diff, mainRobot.leftLeg.texture_metal, mainRobot.leftLeg.texture_mask);
 
 		robotArmy[i].leftLeg2.vertices = mainRobot.leftLeg2.vertices;
 		robotArmy[i].leftLeg2.normals = mainRobot.leftLeg2.normals;
 		robotArmy[i].leftLeg2.texCoords = mainRobot.leftLeg2.texCoords;
 		robotArmy[i].leftLeg2.vertexCount = mainRobot.leftLeg2.vertexCount;
-		robotArmy[i].leftLeg2.texture = mainRobot.leftLeg2.texture;
+		robotArmy[i].leftLeg2.setTextures(mainRobot.leftLeg2.texture_diff, mainRobot.leftLeg2.texture_metal, mainRobot.leftLeg2.texture_mask);
 
 		robotArmy[i].rightLeg.vertices = mainRobot.rightLeg.vertices;
 		robotArmy[i].rightLeg.normals = mainRobot.rightLeg.normals;
 		robotArmy[i].rightLeg.texCoords = mainRobot.rightLeg.texCoords;
 		robotArmy[i].rightLeg.vertexCount = mainRobot.rightLeg.vertexCount;
-		robotArmy[i].rightLeg.texture = mainRobot.rightLeg.texture;
-					 
+		robotArmy[i].rightLeg.setTextures(mainRobot.rightLeg.texture_diff, mainRobot.rightLeg.texture_metal, mainRobot.rightLeg.texture_mask);
+
 		robotArmy[i].rightLeg2.vertices = mainRobot.rightLeg2.vertices;
 		robotArmy[i].rightLeg2.normals = mainRobot.rightLeg2.normals;
 		robotArmy[i].rightLeg2.texCoords = mainRobot.rightLeg2.texCoords;
 		robotArmy[i].rightLeg2.vertexCount = mainRobot.rightLeg2.vertexCount;
-		robotArmy[i].rightLeg2.texture = mainRobot.rightLeg2.texture;
+		robotArmy[i].rightLeg2.setTextures(mainRobot.rightLeg2.texture_diff, mainRobot.rightLeg2.texture_metal, mainRobot.rightLeg2.texture_mask);
 
 
 		robotArmy[i].initRobotValues();
-		
+
 		int row = i / 5;
 		int col = i % 5;
-		robotArmy[i].currentKeyframe.position = glm::vec3(row*10-10, col*10 + 30, -35);
+		robotArmy[i].currentKeyframe.position = glm::vec3(row * 10 - 10, col * 10 + 30, -10);
 	}
 
-	loadModel(terrain, "terrain.fbx");
-	terrain.texture = &tex1;
+	loadModel(terrain, "terrain2.fbx");
+	terrain.texture_diff = &tex3;
+	terrain.texture_metal = &tex4;
+	terrain.texture_mask = &tex5;
+
+	*fshift = 0;
 }
 
 
@@ -1285,7 +1338,8 @@ int main(void)
 	while (!glfwWindowShouldClose(window)) //Tak długo jak okno nie powinno zostać zamknięte
 	{
 		inputControlData.updateControlLoop(glfwGetTime());
-        glfwSetTime(0); //Zeruj timer
+		*fshift += glfwGetTime();
+		glfwSetTime(0); //Zeruj timer
 		drawScene(window, mainRobot); //Wykonaj procedurę rysującą
 		glfwPollEvents(); //Wykonaj procedury callback w zalezności od zdarzeń jakie zaszły.
 	}
