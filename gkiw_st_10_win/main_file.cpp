@@ -19,6 +19,7 @@ Place, Fifth Floor, Boston, MA  02110 - 1301  USA
 
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_SWIZZLE
+#define ARMY_SIZE 20
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
@@ -545,10 +546,6 @@ struct RobotStructure {
 	}
 
 	void moveOneStep(RobotStructure& robot, float stepLength) {  
-		//float angle = robot.currentKeyframe.rotation.z;
-		//std::cout << "angle: " << angle <<"Step length: "<<stepLength<< std::endl;
-		//glm::vec3 forward = glm::vec3(sin(angle), cos(angle), 0.0f);
-
 		robot.currentKeyframe.targetPosition = robot.currentKeyframe.position + glm::vec3(robot.pointingVector) * stepLength;
 
 		inputControlData.lerpPosition = 0.0f;
@@ -724,6 +721,7 @@ void moveLimbsMarch(RobotStructure& robot, RobotJointAngles& keyframe) {
 	}
 
 	robot.changeKeyframe(robot, keyframe);
+	robot.changePosition(robot);
 }
 
 void marchForward(RobotStructure& robot, RobotJointAngles& keyframe) {
@@ -935,9 +933,8 @@ void turningAnimation(RobotStructure& robot, RobotJointAngles& keyframe) {
 }
 
 RobotStructure mainRobot;
-RobotStructure robotArmy[20];
+RobotStructure robotArmy[ARMY_SIZE];
 Model3D terrain;
-
 
 void loadModel(Model3D& model, std::string fileName) {
 
@@ -993,6 +990,12 @@ void loadModel(Model3D& model, std::string fileName) {
 	return;
 }
 
+void armyMarch() {
+	for (int i = 0; i < ARMY_SIZE; i++) {
+		robotArmy[i].isMarching = true;
+	}
+}
+
 void loadRobot(RobotStructure& robot) {
 	loadModel(robot.torso, "robot_torso.fbx");
 	loadModel(robot.head, "robot_head.fbx");
@@ -1035,6 +1038,8 @@ void keyCallback(GLFWwindow* window,int key,int scancode,int action,int mods) {
 		if (key == GLFW_KEY_W) mainRobot.direction = FORWARD;
 		if (key == GLFW_KEY_S) mainRobot.direction = BACKWARD;
 		if (key == GLFW_KEY_A) inputControlData.speed_z = PI / 70;
+		if (key == GLFW_KEY_D) inputControlData.speed_z = -PI / 70;
+		if (key == GLFW_KEY_I) armyMarch();
 		// shift odpowiada za kontrolowanie prawej strony ciala - bark, lokiec, dlon
 		if (mods & GLFW_MOD_SHIFT) {
 			if (key == GLFW_KEY_R) inputControlData.right_shoulder_speed -= PI / 15;
@@ -1200,6 +1205,14 @@ void freeOpenGLProgram(GLFWwindow* window) {
     delete sp;
 }
 
+void armyMarchControl(RobotStructure& robot) {
+	if (robot.isMarching) {
+		robot.isMarchingAnimationFinished = false;
+	}
+
+	if (robot.isMarching || !robot.isMarchingAnimationFinished) marchForward(robot, robot.currentKeyframe);
+}
+
 void userInputMove(RobotStructure& robot) {
 	//robot.torso.localEulerRotation.x = inputControlData.angle_y;
 	//robot.torso.localEulerRotation.z = inputControlData.angle_x;
@@ -1257,12 +1270,11 @@ void drawScene(GLFWwindow* window, RobotStructure& robot) {
 	int radius = 23 - inputControlData.zoom;
 
 	userInputMove(robot);
-	
-
 
 	robot.directKinematicsLogic();
 	for (int i = 0; i < sizeof(robotArmy) / sizeof(robotArmy[0]); i++) {
 		robotArmy[i].directKinematicsLogic();
+		armyMarchControl(robotArmy[i]);
 	}
 
 
