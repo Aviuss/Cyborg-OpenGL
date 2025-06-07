@@ -274,9 +274,10 @@ struct Model3D {
 
 	}
 
-	inline void applyTransform(glm::mat4& originMatrix) {
+	inline void applyTransform(glm::mat4 originMatrix) {
 		localMatrix = glm::translate(originMatrix, localTransform);
 	}
+
 
 	inline void applyRotation(std::string order = "XYZ") {
 		for (int i = 0; i < order.size(); i++) {
@@ -522,12 +523,6 @@ struct RobotStructure {
 		robot.currentKeyframe = newKeyframe;
 	}
 
-	void finalizeMovementIfDone(RobotStructure& robot) {
-		if (inputControlData.lerpPosition >= 1.0f) {
-			inputControlData.lerpPosition = 1.0f;
-			robot.currentKeyframe.position = robot.currentKeyframe.targetPosition;
-		}
-	}
 
 	void changePosition(RobotStructure& robot) {
 		robot.currentKeyframe.position = glm::mix(
@@ -535,8 +530,15 @@ struct RobotStructure {
 			robot.currentKeyframe.targetPosition,
 			inputControlData.lerpPosition
 		);
-		std::cout << "Lerp: " << inputControlData.lerpPosition << std::endl;
-		finalizeMovementIfDone(robot);
+		//std::cout << "Lerp: " << inputControlData.lerpPosition << std::endl;
+		//std::cout << "Marching? " << robot.isMarching << std::endl;
+		//std::cout << "CurrentPos: " << robot.currentKeyframe.position.x << " " << robot.currentKeyframe.position.y << " " << robot.currentKeyframe.position.z << " " << std::endl;
+		//std::cout << "TargetPos: " << robot.currentKeyframe.targetPosition.x << " " << robot.currentKeyframe.targetPosition.y << " " << robot.currentKeyframe.targetPosition.z << " " << std::endl;
+		
+		if (inputControlData.lerpPosition >= 1.0f) {
+			inputControlData.lerpPosition = 1.0f;
+			robot.currentKeyframe.position = robot.currentKeyframe.targetPosition;
+		}
 	}
 
 	void turn(RobotStructure& robot, float angle) {
@@ -545,7 +547,14 @@ struct RobotStructure {
 		changeKeyframe(robot, newKeyframe);
 	}
 
+	void calculatePointingVector() {
+		pointingVector =
+			glm::rotate(glm::mat4(1.0f), currentKeyframe.rotation.z, glm::vec3(0, 0, 1))
+			* glm::vec4(0, -1, 0, 0);
+	}
+
 	void moveOneStep(RobotStructure& robot, float stepLength) {  
+		robot.calculatePointingVector();
 		robot.currentKeyframe.targetPosition = robot.currentKeyframe.position + glm::vec3(robot.pointingVector) * stepLength;
 
 		inputControlData.lerpPosition = 0.0f;
@@ -993,6 +1002,7 @@ void loadModel(Model3D& model, std::string fileName) {
 void armyMarch() {
 	for (int i = 0; i < ARMY_SIZE; i++) {
 		robotArmy[i].isMarching = true;
+		robotArmy[i].currentKeyframe.targetPosition = robotArmy[i].currentKeyframe.position;
 	}
 }
 
@@ -1106,8 +1116,6 @@ void windowResizeCallback(GLFWwindow* window,int width,int height) {
 }
 
 
-RobotJointAngles keyframe0(glm::vec3(0,0,3), glm::vec3(0,0,PI), PI / 7, PI / 10, PI / 5, PI / 4, PI / 2, PI / 2, PI / 3, PI / 5, PI / 4, 0, PI / 2, PI / 3,
-	PI / 4, -PI / 10, -PI / 10, PI / 10, -PI / 4, PI / 10, -PI / 4, -PI / 2);
 
 RobotJointAngles keyframe1(glm::vec3(0, 0, 3), glm::vec3(0, 0, PI), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
@@ -1156,6 +1164,25 @@ void initOpenGLProgram(GLFWwindow* window) {
 		robotArmy[i].leftArm.vertexCount = mainRobot.leftArm.vertexCount;
 		robotArmy[i].leftArm.setTextures(mainRobot.leftArm.texture_diff, mainRobot.leftArm.texture_metal, mainRobot.leftArm.texture_mask);
 
+		robotArmy[i].leftArm2.vertices = mainRobot.leftArm2.vertices;
+		robotArmy[i].leftArm2.normals = mainRobot.leftArm2.normals;
+		robotArmy[i].leftArm2.texCoords = mainRobot.leftArm2.texCoords;
+		robotArmy[i].leftArm2.vertexCount = mainRobot.leftArm2.vertexCount;
+		robotArmy[i].leftArm2.setTextures(mainRobot.leftArm2.texture_diff, mainRobot.leftArm2.texture_metal, mainRobot.leftArm2.texture_mask);
+
+		robotArmy[i].rightArm.vertices = mainRobot.rightArm.vertices;
+		robotArmy[i].rightArm.normals = mainRobot.rightArm.normals;
+		robotArmy[i].rightArm.texCoords = mainRobot.rightArm.texCoords;
+		robotArmy[i].rightArm.vertexCount = mainRobot.rightArm.vertexCount;
+		robotArmy[i].rightArm.setTextures(mainRobot.rightArm.texture_diff, mainRobot.rightArm.texture_metal, mainRobot.rightArm.texture_mask);
+
+		robotArmy[i].rightArm2.vertices = mainRobot.rightArm2.vertices;
+		robotArmy[i].rightArm2.normals = mainRobot.rightArm2.normals;
+		robotArmy[i].rightArm2.texCoords = mainRobot.rightArm2.texCoords;
+		robotArmy[i].rightArm2.vertexCount = mainRobot.rightArm2.vertexCount;
+		robotArmy[i].rightArm2.setTextures(mainRobot.rightArm2.texture_diff, mainRobot.rightArm2.texture_metal, mainRobot.rightArm2.texture_mask);
+
+
 
 		robotArmy[i].leftLeg.vertices = mainRobot.leftLeg.vertices;
 		robotArmy[i].leftLeg.normals = mainRobot.leftLeg.normals;
@@ -1182,6 +1209,8 @@ void initOpenGLProgram(GLFWwindow* window) {
 		robotArmy[i].rightLeg2.setTextures(mainRobot.rightLeg2.texture_diff, mainRobot.rightLeg2.texture_metal, mainRobot.rightLeg2.texture_mask);
 
 
+		robotArmy[i].currentKeyframe = keyframe1;
+
 		robotArmy[i].initRobotValues();
 
 		int row = i / 5;
@@ -1193,6 +1222,7 @@ void initOpenGLProgram(GLFWwindow* window) {
 	terrain.texture_diff = &tex3;
 	terrain.texture_metal = &tex4;
 	terrain.texture_mask = &tex5;
+	terrain.localTransform.z = -3;
 
 	*fshift = 0;
 }
@@ -1214,15 +1244,8 @@ void armyMarchControl(RobotStructure& robot) {
 }
 
 void userInputMove(RobotStructure& robot) {
-	//robot.torso.localEulerRotation.x = inputControlData.angle_y;
-	//robot.torso.localEulerRotation.z = inputControlData.angle_x;
-
-	std::cout << inputControlData.angle_x << std::endl;
-	std::cout << robot.currentKeyframe.position.y << " , " << robot.currentKeyframe.targetPosition.y << std::endl;
-	//robot.currentKeyframe.position.y = -20*inputControlData.val;
-	robot.currentKeyframe.position.z = inputControlData.angle_x;
-
 	//CZESCI CIALA
+
 	if (robot.control == MANUAL) {
 		robot.currentKeyframe.right_shoulder_forward = inputControlData.right_shoulder_angle;
 		robot.currentKeyframe.right_elbow = inputControlData.right_elbow_angle;
@@ -1232,32 +1255,27 @@ void userInputMove(RobotStructure& robot) {
 		robot.currentKeyframe.left_hand = inputControlData.left_hand_angle;
 		robot.currentKeyframe.head_rot = inputControlData.head_angle;
 	}
-	//robot.currentKeyframe.targetPosition = robot.currentKeyframe.position;
 
 	if (robot.isMarching) {
 		robot.isMarchingAnimationFinished = false;
-	}
-
-	if (robot.direction == FORWARD) {
-		robot.isForwardAnimationFinished = false;
-	}
-
-	if (robot.direction == BACKWARD) {
-		robot.isBackwardAnimationFinished = false;
-	}
-
-	if (inputControlData.speed_z != 0) {
+		marchForward(robot, robot.currentKeyframe);
+	
+	} else if (inputControlData.speed_z != 0 || !robot.isTurningAnimationFinished) {
 		robot.isTurningAnimationFinished = false;
-	}
-
-	if (inputControlData.speed_z != 0 || !robot.isTurningAnimationFinished) {
 		turningAnimation(robot, robot.currentKeyframe);
+
+	}
+	else if (robot.direction == FORWARD) {
+		robot.isForwardAnimationFinished = false;
+		forwardStepAnimation(robot, robot.currentKeyframe);
+
+	} else if (robot.direction == BACKWARD) {
+		robot.isBackwardAnimationFinished = false;
+		backwardStepAnimation(robot, robot.currentKeyframe);
+
 	}
 
-	if (robot.isMarching || !robot.isMarchingAnimationFinished) marchForward(robot, robot.currentKeyframe);
-	if (robot.direction == FORWARD || !robot.isForwardAnimationFinished)  forwardStepAnimation( robot, robot.currentKeyframe);
-	if (robot.direction == BACKWARD || !robot.isBackwardAnimationFinished) backwardStepAnimation(robot, robot.currentKeyframe);
-
+		
 	if (inputControlData.lerpPosition < 1.0f) robot.changePosition(robot);
 }
 
@@ -1272,16 +1290,15 @@ void drawScene(GLFWwindow* window, RobotStructure& robot) {
 	userInputMove(robot);
 
 	robot.directKinematicsLogic();
+	
 	for (int i = 0; i < sizeof(robotArmy) / sizeof(robotArmy[0]); i++) {
-		robotArmy[i].directKinematicsLogic();
 		armyMarchControl(robotArmy[i]);
+		robotArmy[i].directKinematicsLogic();
 	}
 
 
 	// obliczenie wektora wskazujacego
-	robot.pointingVector =
-		glm::rotate(glm::mat4(1.0f), robot.currentKeyframe.rotation.z, glm::vec3(0, 0, 1))
-		* glm::vec4(0, -1, 0, 0);
+	robot.calculatePointingVector();
 
 	glm::vec4 camera_back_off =
 		glm::rotate(glm::mat4(1.0f), inputControlData.rot_angle+robot.currentKeyframe.rotation.z, glm::vec3(0, 0, 1))
@@ -1302,18 +1319,12 @@ void drawScene(GLFWwindow* window, RobotStructure& robot) {
 
     glm::mat4 P=glm::perspective(50.0f*PI/180.0f, aspectRatio, 0.01f, 500.0f); //Wylicz macierz rzutowania
     
-
+	terrain.applyTransform(glm::mat4(1.0f));
 	terrain.drawOpenGL(P, V);
 	robot.drawWholeRobot(P, V);
 
 	for (int i = 0; i < sizeof(robotArmy) / sizeof(robotArmy[0]); i++) {
-		robotArmy[i].head.drawOpenGL(P, V);
-		robotArmy[i].torso.drawOpenGL(P, V);
-		robotArmy[i].leftArm.drawOpenGL(P, V);
-		robotArmy[i].leftLeg.drawOpenGL(P, V);
-		robotArmy[i].leftLeg2.drawOpenGL(P, V);
-		robotArmy[i].rightLeg.drawOpenGL(P, V);
-		robotArmy[i].rightLeg2.drawOpenGL(P, V);
+		robotArmy[i].drawWholeRobot(P, V);
 	}
 
     glfwSwapBuffers(window); //Przerzuć tylny bufor na przedni
