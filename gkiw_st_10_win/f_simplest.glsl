@@ -1,20 +1,29 @@
 #version 330
 
+#define LIGHTSOURCES 41
+
 uniform sampler2D textureMap0;
 uniform sampler2D textureMap1;
+uniform mat4 V;
 uniform sampler2D textureMap2;
 
 in vec4 iC;
-in vec4 l1;
-in vec4 l2;
 in vec4 n;
 in vec4 v;
 in vec2 iTexCoord0;
 in vec2 iTexCoord1;
 
+uniform vec4 arrayLightsColor[LIGHTSOURCES ];
+uniform vec4 arrayLights[LIGHTSOURCES];
+
+
+
 uniform float fshift;
 
 out vec4 pixelColor; //Zmienna wyjsciowa fragment shadera. Zapisuje sie do niej ostateczny (prawie) kolor piksela
+in vec4 worldVertex;
+
+
 
 
 // Fade function for smoothing
@@ -67,40 +76,39 @@ float perlin(vec2 p) {
     return 0.5+0.5*nxy;
 }
 
+vec4 colorPixelByLightSource(vec4 lp, vec4 mn, vec4 mv, vec4 ks, vec4 kd, vec4 color, float lightDistance) {
+    vec4 ml = normalize(lp);
+	vec4 mr=reflect(-ml,mn); //Wektor odbity
+    
+	float nl = clamp(dot(mn, ml), 0, 1); //Kosinus kąta pomiędzy wektorami n i l1.
+	float rv = pow(clamp(dot(mr, mv), 0, 1), 25); // Kosinus kąta pomiędzy wektorami r i v podniesiony do 25 potęgi
+    
+    lightDistance -= 0.55;
+
+	return (color * vec4(nl * kd.rgb, kd.a) + vec4(ks.rgb*rv, 0)) / (0.04*lightDistance*lightDistance+0.1*lightDistance+0.5);
+}
 
 void main(void) {
-	vec4 kd = texture(textureMap0, iTexCoord0);
+    
+    
+    vec4 kd = texture(textureMap0, iTexCoord0);
 	vec4 ks = texture(textureMap1, iTexCoord0);
 	vec4 maskTexture = texture(textureMap2, iTexCoord0);
     
-	vec4 ml1 = normalize(l1);
-	vec4 ml2 = normalize(l2);
 	vec4 mn = normalize(n);
 	vec4 mv = normalize(v);
-	vec4 mr1=reflect(-ml1,mn); //Wektor odbity
-    vec4 mr2=reflect(-ml2,mn); //Wektor odbity
-
-	float nl1 = clamp(dot(mn, ml1), 0, 1); //Kosinus kąta pomiędzy wektorami n i l1.
-	float rv1 = pow(clamp(dot(mr1, mv), 0, 1), 25); // Kosinus kąta pomiędzy wektorami r i v podniesiony do 25 potęgi
-    float nl2 = clamp(dot(mn, ml2), 0, 1); //Kosinus kąta pomiędzy wektorami n i l2.
-	float rv2 = pow(clamp(dot(mr2, mv), 0, 1), 25); // Kosinus kąta pomiędzy wektorami r i v podniesiony do 25 potęgi
 
     
-	pixelColor  = vec4(0.01 * kd.rgb, kd.a);//environmental lightning
-    
-    pixelColor += vec4(1.5,1.5,1.5,1) * vec4(nl1 * kd.rgb, kd.a); // lp1 lambert lightning
-    pixelColor += vec4(ks.rgb*rv1, 0); // lp1 phong reflection
-    
-    pixelColor += vec4(0.5,0.1,0.1,1) * vec4(nl2 * kd.rgb, kd.a); // lp2 lambert lightning
-    pixelColor += vec4(ks.rgb*rv2, 0); // lp2 phong reflection
-
+	pixelColor  = vec4(0.1 * kd.rgb, kd.a);//environmental lightning    
+    for (int i = 0; i < LIGHTSOURCES ; ++i) {
+        pixelColor += colorPixelByLightSource(normalize(V* (arrayLights[i] - worldVertex )), mn, mv, ks, kd, arrayLightsColor[i], distance(arrayLights[i] , worldVertex));
+    }
 
 	// perlin mask for fluid like simulation
-    float perlin_noise_frequency = 30;
+    float perlin_noise_frequency = 80;
     float perlin_val = perlin((iTexCoord0)*perlin_noise_frequency);
     
-
-    vec4 fluidColor = vec4(pow(perlin_val, 0.8), 1, pow(perlin_val, 0.8), 0);
+    vec4 fluidColor = vec4(0, perlin_val, 0, 0) + vec4((1-perlin_val)*0.4,(1-perlin_val)*0.4,(1-perlin_val)*0.4,0);
 
 	pixelColor = vec4(pixelColor.r * (1-maskTexture.r), pixelColor.g * (1-maskTexture.g), pixelColor.b * (1-maskTexture.b), pixelColor.a * (1-maskTexture.a) );
 	pixelColor = pixelColor + vec4(fluidColor.r*maskTexture.r, fluidColor.g*maskTexture.g, fluidColor.b*maskTexture.b, fluidColor.a*maskTexture.a);

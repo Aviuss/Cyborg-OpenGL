@@ -19,7 +19,7 @@ Place, Fifth Floor, Boston, MA  02110 - 1301  USA
 
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_SWIZZLE
-#define ARMY_SIZE 20
+#define ARMY_SIZE 40
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
@@ -52,6 +52,10 @@ GLuint tex4;
 GLuint tex5;
 
 float* fshift = new float[1];
+
+glm::vec4 arrayLights[41];
+glm::vec4 arrayLightsColor[41];
+
 
 enum whichStep { // dla uzytku ruszajacego sie robota
 	LEFT_LEG_FORWARD,
@@ -103,6 +107,9 @@ GLuint readTexture(const char* filename) {
 	//Wczytaj obrazek do pamięci KG skojarzonej z uchwytem
 	glTexImage2D(GL_TEXTURE_2D, 0, 4, width, height, 0,
 		GL_RGBA, GL_UNSIGNED_BYTE, (unsigned char*)image.data());
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glGenerateMipmap(GL_TEXTURE_2D);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	return tex;
@@ -248,6 +255,11 @@ struct Model3D {
 		glUniform4f(sp->u("lp2"), -40, 0, 15, 1);
 		glUniform1f(sp->u("fshift"), *fshift);
 
+		// Send the array to the shader
+		glUniform4fv(sp->u("arrayLights"), 41, glm::value_ptr(arrayLights[0]));
+		glUniform4fv(sp->u("arrayLightsColor"), 41, glm::value_ptr(arrayLightsColor[0]));
+
+
 		if (texture_diff != nullptr) {
 			glUniform1i(sp->u("textureMap0"), 0); //drawScene
 		}
@@ -280,14 +292,20 @@ struct Model3D {
 		if (texture_diff != nullptr) {
 			glActiveTexture(GL_TEXTURE0);
 			glBindTexture(GL_TEXTURE_2D, *texture_diff);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
+				GL_LINEAR_MIPMAP_LINEAR);
 		}
 		if (texture_metal != nullptr) {
 			glActiveTexture(GL_TEXTURE1);
 			glBindTexture(GL_TEXTURE_2D, *texture_metal);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
+				GL_LINEAR_MIPMAP_LINEAR);
 		}
 		if (texture_mask != nullptr) {
 			glActiveTexture(GL_TEXTURE2);
 			glBindTexture(GL_TEXTURE_2D, *texture_mask);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
+				GL_LINEAR_MIPMAP_LINEAR);
 		}
 
 
@@ -448,7 +466,8 @@ struct RobotStructure {
 	glm::vec4 pointingVector;
 
 	RobotJointAngles currentKeyframe;
-
+	
+	glm::vec4* lightSourcePosition;
 
 	GLuint* texture_diff = nullptr;
 	GLuint* texture_metal = nullptr;
@@ -522,6 +541,9 @@ struct RobotStructure {
 
 		rightHand.applyTransform(rightArm2.localMatrix);
 		rightHand.applyRotation();
+
+		calculatePointingVector();
+		(*lightSourcePosition) = glm::vec4(currentKeyframe.position, 1) + glm::vec4(0, 0, 6, 0) + glm::vec4(pointingVector.x * -2.2, pointingVector.y * -2.2, pointingVector.z * -2.2, 0);
 	}
 
 	inline void drawWholeRobot(glm::mat4& P, glm::mat4& V) {
@@ -1169,13 +1191,20 @@ void initOpenGLProgram(GLFWwindow* window) {
 	tex5 = readTexture("black_pixel.png");
 
 
+	for (int i = 0; i < 41; i++) {
+		arrayLights[i] = glm::vec4(0, 0, 0, 0);
+		arrayLightsColor[i] = glm::vec4(0, 0, 0, 0);
+	}
 
 
 	mainRobot.currentKeyframe = keyframe1;
 	mainRobot.texture_diff = &tex0;
 	mainRobot.texture_metal = &tex1;
 	mainRobot.texture_mask = &tex2;
+	mainRobot.lightSourcePosition = &arrayLights[0];
+	arrayLightsColor[0] = glm::vec4(0, 0.6, 0, 1);
 	loadRobot(mainRobot);
+
 
 	for (int i = 0; i < sizeof(robotArmy) / sizeof(robotArmy[0]); i++) {
 		robotArmy[i].head.vertices = mainRobot.head.vertices;
@@ -1245,9 +1274,12 @@ void initOpenGLProgram(GLFWwindow* window) {
 
 		robotArmy[i].initRobotValues();
 
-		int row = i / 5;
-		int col = i % 5;
+		int row = i / 10;
+		int col = i % 10;
 		robotArmy[i].currentKeyframe.position = glm::vec3(row * 10 - 10, col * 10 + 30, -10);
+
+		robotArmy[i].lightSourcePosition = &arrayLights[i + 1];
+		arrayLightsColor[i + 1] = glm::vec4(0, 0.6, 0, 1);
 	}
 
 	loadModel(terrain, "terrain2.fbx");
