@@ -146,6 +146,30 @@ struct ControlData {
 		left_elbow_angle += left_elbow_speed * deltaTime;
 		left_hand_angle += left_hand_speed * deltaTime;
 		head_angle += head_speed * deltaTime;
+
+		if (shift_modifier_refresh > 0) {
+			shift_modifier_refresh -= deltaTime;
+		}
+		if (ctrl_modifier_refresh > 0) {
+			ctrl_modifier_refresh -= deltaTime;
+		}
+
+		if (shift_modifier_refresh <= 0) {
+			right_shoulder_speed = 0;
+			right_elbow_speed = 0;
+			right_hand_speed = 0;
+			right_shoulder_speed = 0;
+			right_elbow_speed = 0;
+			right_hand_speed = 0;
+		}
+		if (ctrl_modifier_refresh <= 0) {
+			left_shoulder_speed = 0;
+			left_elbow_speed = 0;
+			left_hand_speed = 0;
+			left_shoulder_speed = 0;
+			left_elbow_speed = 0;
+			left_hand_speed = 0;
+		}
 	}
 
 	float speed_x = 0;
@@ -161,6 +185,10 @@ struct ControlData {
 	float right_elbow_speed = 0;
 	float right_hand_speed = 0;
 	float head_speed = 0;
+
+	int shift_modifier_refresh = 0;
+	int ctrl_modifier_refresh = 0;
+	float refresh_value = 2;
 };
 ControlData inputControlData;
 
@@ -1034,7 +1062,7 @@ void error_callback(int error, const char* description) {
 }
 
 void keyCallback(GLFWwindow* window,int key,int scancode,int action,int mods) {
-	if (action == GLFW_PRESS) {
+	if (action == GLFW_PRESS || action == GLFW_REPEAT) {
 		if (key == GLFW_KEY_LEFT) inputControlData.speed_x = -PI / 2;
 		if (key == GLFW_KEY_RIGHT) inputControlData.speed_x = PI / 2;
 		if (key == GLFW_KEY_UP) inputControlData.speed_y = PI / 2;
@@ -1052,24 +1080,26 @@ void keyCallback(GLFWwindow* window,int key,int scancode,int action,int mods) {
 		if (key == GLFW_KEY_I) armyMarch();
 		// shift odpowiada za kontrolowanie prawej strony ciala - bark, lokiec, dlon
 		if (mods & GLFW_MOD_SHIFT) {
-			if (key == GLFW_KEY_R) inputControlData.right_shoulder_speed -= PI / 15;
-			if (key == GLFW_KEY_T) inputControlData.right_elbow_speed -= PI / 15;
-			if (key == GLFW_KEY_V) inputControlData.right_hand_speed -= PI / 15;
-			if (key == GLFW_KEY_Z) inputControlData.right_shoulder_speed += PI / 15;
-			if (key == GLFW_KEY_X) inputControlData.right_elbow_speed += PI / 15;
-			if (key == GLFW_KEY_C) inputControlData.right_hand_speed += PI / 15;
+			if (key == GLFW_KEY_R) inputControlData.right_shoulder_speed = -PI / 10;
+			if (key == GLFW_KEY_T) inputControlData.right_elbow_speed = -PI / 10;
+			if (key == GLFW_KEY_V) inputControlData.right_hand_speed = -PI / 10;
+			if (key == GLFW_KEY_Z) inputControlData.right_shoulder_speed = PI / 10;
+			if (key == GLFW_KEY_X) inputControlData.right_elbow_speed = PI / 10;
+			if (key == GLFW_KEY_C) inputControlData.right_hand_speed = PI / 10;
+			inputControlData.shift_modifier_refresh = inputControlData.refresh_value;
 		}
 		// control odpowiada za kontrolowanie lewej strony ciala
 		if (mods & GLFW_MOD_CONTROL) {
-			if (key == GLFW_KEY_R) inputControlData.left_shoulder_speed += PI / 15;
-			if (key == GLFW_KEY_T) inputControlData.left_elbow_speed += PI / 15;
-			if (key == GLFW_KEY_V) inputControlData.left_hand_speed += PI / 15;
-			if (key == GLFW_KEY_Z) inputControlData.left_shoulder_speed -= PI / 15;
-			if (key == GLFW_KEY_X) inputControlData.left_elbow_speed -= PI / 15;
-			if (key == GLFW_KEY_C) inputControlData.left_hand_speed -= PI / 15;
+			if (key == GLFW_KEY_R) inputControlData.left_shoulder_speed = PI / 10;
+			if (key == GLFW_KEY_T) inputControlData.left_elbow_speed = PI / 10;
+			if (key == GLFW_KEY_V) inputControlData.left_hand_speed = PI / 10;
+			if (key == GLFW_KEY_Z) inputControlData.left_shoulder_speed = -PI / 10;
+			if (key == GLFW_KEY_X) inputControlData.left_elbow_speed = -PI / 10;
+			if (key == GLFW_KEY_C) inputControlData.left_hand_speed = -PI / 10;
+			inputControlData.ctrl_modifier_refresh = inputControlData.refresh_value;
 		}
-		if (key == GLFW_KEY_Y) inputControlData.head_speed += PI / 20;
-		if (key == GLFW_KEY_U) inputControlData.head_speed -= PI / 20;
+		if (key == GLFW_KEY_Y) inputControlData.head_speed = PI / 20;
+		if (key == GLFW_KEY_U) inputControlData.head_speed = -PI / 20;
 		if (key == GLFW_KEY_3) mainRobot.isMarching = true;
     }
     if (action==GLFW_RELEASE) {
@@ -1095,6 +1125,7 @@ void keyCallback(GLFWwindow* window,int key,int scancode,int action,int mods) {
 			if (key == GLFW_KEY_Z) inputControlData.right_shoulder_speed = 0;
 			if (key == GLFW_KEY_X) inputControlData.right_elbow_speed = 0;
 			if (key == GLFW_KEY_C) inputControlData.right_hand_speed = 0;
+			inputControlData.shift_modifier_refresh = 0;
 		}
 		if (mods & GLFW_MOD_CONTROL) {
 			if (key == GLFW_KEY_R) inputControlData.left_shoulder_speed = 0;
@@ -1103,6 +1134,7 @@ void keyCallback(GLFWwindow* window,int key,int scancode,int action,int mods) {
 			if (key == GLFW_KEY_Z) inputControlData.left_shoulder_speed = 0;
 			if (key == GLFW_KEY_X) inputControlData.left_elbow_speed = 0;
 			if (key == GLFW_KEY_C) inputControlData.left_hand_speed = 0;
+			inputControlData.shift_modifier_refresh = 0;
 		}
 		if (key == GLFW_KEY_Y) inputControlData.head_speed = 0;
 		if (key == GLFW_KEY_U) inputControlData.head_speed = 0;
@@ -1243,10 +1275,13 @@ void armyMarchControl(RobotStructure& robot) {
 	if (robot.isMarching || !robot.isMarchingAnimationFinished) marchForward(robot, robot.currentKeyframe);
 }
 
+
+
 void userInputMove(RobotStructure& robot) {
 	//CZESCI CIALA
 
 	if (robot.control == MANUAL) {
+		std::cout << "manual control " << std::endl;
 		robot.currentKeyframe.right_shoulder_forward = inputControlData.right_shoulder_angle;
 		robot.currentKeyframe.right_elbow = inputControlData.right_elbow_angle;
 		robot.currentKeyframe.right_hand = inputControlData.right_hand_angle;
@@ -1256,7 +1291,7 @@ void userInputMove(RobotStructure& robot) {
 		robot.currentKeyframe.head_rot = inputControlData.head_angle;
 	}
 
-	if (robot.isMarching) {
+	if (robot.isMarching || !robot.isMarchingAnimationFinished) {
 		robot.isMarchingAnimationFinished = false;
 		marchForward(robot, robot.currentKeyframe);
 	
@@ -1264,12 +1299,11 @@ void userInputMove(RobotStructure& robot) {
 		robot.isTurningAnimationFinished = false;
 		turningAnimation(robot, robot.currentKeyframe);
 
-	}
-	else if (robot.direction == FORWARD) {
+	} else if (robot.direction == FORWARD || !robot.isForwardAnimationFinished) {
 		robot.isForwardAnimationFinished = false;
 		forwardStepAnimation(robot, robot.currentKeyframe);
 
-	} else if (robot.direction == BACKWARD) {
+	} else if (robot.direction == BACKWARD || !robot.isBackwardAnimationFinished) {
 		robot.isBackwardAnimationFinished = false;
 		backwardStepAnimation(robot, robot.currentKeyframe);
 
