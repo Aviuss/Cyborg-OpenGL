@@ -1218,7 +1218,7 @@ void initOpenGLProgram(GLFWwindow* window) {
 	mainRobot.texture_metal = &tex_rusty_metal_metalness;
 	mainRobot.texture_mask = &tex_robot_fluid_mask_effect;
 	mainRobot.lightSourcePosition = &arrayLights[0];
-	arrayLightsColor[0] = glm::vec4(0, 0.6, 0, 1);
+	arrayLightsColor[0] = glm::vec4(0, 0.45, 0, 1);
 	loadRobot(mainRobot);
 
 
@@ -1315,7 +1315,7 @@ void initOpenGLProgram(GLFWwindow* window) {
 		robotArmy[i].currentKeyframe.position = glm::vec3(row * 10 - 10, col * 20 + 30, 0);
 
 		robotArmy[i].lightSourcePosition = &arrayLights[i + 1];
-		arrayLightsColor[i + 1] = glm::vec4(0, 0.6, 0, 1);
+		arrayLightsColor[i + 1] = glm::vec4(0, 0.45, 0, 1);
 	}
 
 	loadModel(terrain, "terrain3.fbx");
