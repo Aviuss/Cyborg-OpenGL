@@ -20,6 +20,7 @@ Place, Fifth Floor, Boston, MA  02110 - 1301  USA
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_SWIZZLE
 #define ARMY_SIZE 40
+#define LIGHT_SOURCES 10
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
@@ -44,17 +45,17 @@ float aspectRatio=1;
 
 ShaderProgram *sp;
 
-GLuint tex0;
-GLuint tex1;
-GLuint tex2;
-GLuint tex3;
-GLuint tex4;
-GLuint tex5;
+GLuint tex_rusty_metal_diff;
+GLuint tex_rusty_metal_metalness;
+GLuint tex_robot_fluid_mask_effect;
+GLuint tex_ground_col;
+GLuint tex_ground_roughness;
+GLuint tex_black_pixel;
 
 float* fshift = new float[1];
 
-glm::vec4 arrayLights[41];
-glm::vec4 arrayLightsColor[41];
+glm::vec4 arrayLights[ARMY_SIZE + LIGHT_SOURCES + 1];
+glm::vec4 arrayLightsColor[ARMY_SIZE + LIGHT_SOURCES + 1];
 
 
 enum whichStep { // dla uzytku ruszajacego sie robota
@@ -256,8 +257,8 @@ struct Model3D {
 		glUniform1f(sp->u("fshift"), *fshift);
 
 		// Send the array to the shader
-		glUniform4fv(sp->u("arrayLights"), 41, glm::value_ptr(arrayLights[0]));
-		glUniform4fv(sp->u("arrayLightsColor"), 41, glm::value_ptr(arrayLightsColor[0]));
+		glUniform4fv(sp->u("arrayLights"), ARMY_SIZE + LIGHT_SOURCES + 1, glm::value_ptr(arrayLights[0]));
+		glUniform4fv(sp->u("arrayLightsColor"), ARMY_SIZE + LIGHT_SOURCES + 1, glm::value_ptr(arrayLightsColor[0]));
 
 
 		if (texture_diff != nullptr) {
@@ -994,6 +995,7 @@ void turningAnimation(RobotStructure& robot, RobotJointAngles& keyframe) {
 RobotStructure mainRobot;
 RobotStructure robotArmy[ARMY_SIZE];
 Model3D terrain;
+Model3D lamps[LIGHT_SOURCES];
 
 void loadModel(Model3D& model, std::string fileName) {
 
@@ -1171,7 +1173,7 @@ void windowResizeCallback(GLFWwindow* window,int width,int height) {
 
 
 
-RobotJointAngles keyframe1(glm::vec3(0, 0, 3), glm::vec3(0, 0, PI), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+RobotJointAngles keyframe1(glm::vec3(0, 0, 0), glm::vec3(0, 0, PI), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
 
 //Procedura inicjująca
@@ -1183,24 +1185,38 @@ void initOpenGLProgram(GLFWwindow* window) {
 	glfwSetKeyCallback(window,keyCallback);
 
 	sp=new ShaderProgram("v_simplest.glsl",NULL,"f_simplest.glsl");
-	tex0 = readTexture("rusty_metal_04_diff_4k.png");
-	tex1 = readTexture("rusty_metal_04_metal_4k.png");
-	tex2 = readTexture("green effect mask.png");
-	tex3 = readTexture("TerrazzoSlab028/TerrazzoSlab028_COL_2K_METALNESS.png");
-	tex4 = readTexture("TerrazzoSlab028/TerrazzoSlab028_ROUGHNESS_2K_METALNESS.png");
-	tex5 = readTexture("black_pixel.png");
+	tex_rusty_metal_diff = readTexture("rusty_metal_04_diff_4k.png");
+	tex_rusty_metal_metalness = readTexture("rusty_metal_04_metal_4k.png");
+	tex_robot_fluid_mask_effect = readTexture("green effect mask.png");
+	tex_ground_col = readTexture("TerrazzoSlab028/TerrazzoSlab028_COL_2K_METALNESS.png");
+	tex_ground_roughness = readTexture("TerrazzoSlab028/TerrazzoSlab028_ROUGHNESS_2K_METALNESS.png");
+	tex_black_pixel = readTexture("black_pixel.png");
 
 
-	for (int i = 0; i < 41; i++) {
+	for (int i = 0; i < ARMY_SIZE + LIGHT_SOURCES + 1; i++) {
 		arrayLights[i] = glm::vec4(0, 0, 0, 0);
 		arrayLightsColor[i] = glm::vec4(0, 0, 0, 0);
 	}
 
+	for (int i = 0; i < LIGHT_SOURCES; i++) {
+		loadModel(lamps[i], "lamp.fbx");
+		lamps[i].texture_diff = &tex_rusty_metal_diff;
+		lamps[i].texture_metal = &tex_rusty_metal_metalness;
+		lamps[i].texture_mask = &tex_black_pixel;
+
+		int row = i / 5;
+		int col = i % 5;
+		lamps[i].localTransform = glm::vec3(row * 50 - 20, col * 150 + 30, 0);
+		arrayLights[41+i] = glm::vec4(lamps[i].localTransform, 1) + glm::vec4(0,0,10,0);
+		arrayLightsColor[41+i] = glm::vec4(10, 10, 10, 10);
+
+	}
+
 
 	mainRobot.currentKeyframe = keyframe1;
-	mainRobot.texture_diff = &tex0;
-	mainRobot.texture_metal = &tex1;
-	mainRobot.texture_mask = &tex2;
+	mainRobot.texture_diff = &tex_rusty_metal_diff;
+	mainRobot.texture_metal = &tex_rusty_metal_metalness;
+	mainRobot.texture_mask = &tex_robot_fluid_mask_effect;
 	mainRobot.lightSourcePosition = &arrayLights[0];
 	arrayLightsColor[0] = glm::vec4(0, 0.6, 0, 1);
 	loadRobot(mainRobot);
@@ -1218,6 +1234,13 @@ void initOpenGLProgram(GLFWwindow* window) {
 		robotArmy[i].torso.texCoords = mainRobot.torso.texCoords;
 		robotArmy[i].torso.vertexCount = mainRobot.torso.vertexCount;
 		robotArmy[i].torso.setTextures(mainRobot.torso.texture_diff, mainRobot.torso.texture_metal, mainRobot.torso.texture_mask);
+
+		robotArmy[i].legsHolder.vertices = mainRobot.legsHolder.vertices;
+		robotArmy[i].legsHolder.normals = mainRobot.legsHolder.normals;
+		robotArmy[i].legsHolder.texCoords = mainRobot.legsHolder.texCoords;
+		robotArmy[i].legsHolder.vertexCount = mainRobot.legsHolder.vertexCount;
+		robotArmy[i].legsHolder.setTextures(mainRobot.legsHolder.texture_diff, mainRobot.legsHolder.texture_metal, mainRobot.legsHolder.texture_mask);
+
 
 		robotArmy[i].leftArm.vertices = mainRobot.leftArm.vertices;
 		robotArmy[i].leftArm.normals = mainRobot.leftArm.normals;
@@ -1257,6 +1280,13 @@ void initOpenGLProgram(GLFWwindow* window) {
 		robotArmy[i].leftLeg2.vertexCount = mainRobot.leftLeg2.vertexCount;
 		robotArmy[i].leftLeg2.setTextures(mainRobot.leftLeg2.texture_diff, mainRobot.leftLeg2.texture_metal, mainRobot.leftLeg2.texture_mask);
 
+		robotArmy[i].leftFoot.vertices = mainRobot.leftFoot.vertices;
+		robotArmy[i].leftFoot.normals = mainRobot.leftFoot.normals;
+		robotArmy[i].leftFoot.texCoords = mainRobot.leftFoot.texCoords;
+		robotArmy[i].leftFoot.vertexCount = mainRobot.leftFoot.vertexCount;
+		robotArmy[i].leftFoot.setTextures(mainRobot.leftFoot.texture_diff, mainRobot.leftFoot.texture_metal, mainRobot.leftFoot.texture_mask);
+
+
 		robotArmy[i].rightLeg.vertices = mainRobot.rightLeg.vertices;
 		robotArmy[i].rightLeg.normals = mainRobot.rightLeg.normals;
 		robotArmy[i].rightLeg.texCoords = mainRobot.rightLeg.texCoords;
@@ -1269,6 +1299,12 @@ void initOpenGLProgram(GLFWwindow* window) {
 		robotArmy[i].rightLeg2.vertexCount = mainRobot.rightLeg2.vertexCount;
 		robotArmy[i].rightLeg2.setTextures(mainRobot.rightLeg2.texture_diff, mainRobot.rightLeg2.texture_metal, mainRobot.rightLeg2.texture_mask);
 
+		robotArmy[i].rightFoot.vertices = mainRobot.rightFoot.vertices;
+		robotArmy[i].rightFoot.normals = mainRobot.rightFoot.normals;
+		robotArmy[i].rightFoot.texCoords = mainRobot.rightFoot.texCoords;
+		robotArmy[i].rightFoot.vertexCount = mainRobot.rightFoot.vertexCount;
+		robotArmy[i].rightFoot.setTextures(mainRobot.rightFoot.texture_diff, mainRobot.rightFoot.texture_metal, mainRobot.rightFoot.texture_mask);
+
 
 		robotArmy[i].currentKeyframe = keyframe1;
 
@@ -1276,17 +1312,17 @@ void initOpenGLProgram(GLFWwindow* window) {
 
 		int row = i / 10;
 		int col = i % 10;
-		robotArmy[i].currentKeyframe.position = glm::vec3(row * 10 - 10, col * 10 + 30, -10);
+		robotArmy[i].currentKeyframe.position = glm::vec3(row * 10 - 10, col * 20 + 30, 0);
 
 		robotArmy[i].lightSourcePosition = &arrayLights[i + 1];
 		arrayLightsColor[i + 1] = glm::vec4(0, 0.6, 0, 1);
 	}
 
-	loadModel(terrain, "terrain2.fbx");
-	terrain.texture_diff = &tex3;
-	terrain.texture_metal = &tex4;
-	terrain.texture_mask = &tex5;
-	terrain.localTransform.z = -3;
+	loadModel(terrain, "terrain3.fbx");
+	terrain.texture_diff = &tex_ground_col;
+	terrain.texture_metal = &tex_ground_roughness;
+	terrain.texture_mask = &tex_black_pixel;
+	terrain.localTransform.z = -2;
 
 	*fshift = 0;
 }
@@ -1357,6 +1393,7 @@ void drawScene(GLFWwindow* window, RobotStructure& robot) {
 
 	robot.directKinematicsLogic();
 	
+	
 	for (int i = 0; i < sizeof(robotArmy) / sizeof(robotArmy[0]); i++) {
 		armyMarchControl(robotArmy[i]);
 		robotArmy[i].directKinematicsLogic();
@@ -1380,7 +1417,7 @@ void drawScene(GLFWwindow* window, RobotStructure& robot) {
 	glm::vec3 up = glm::normalize(glm::cross(cameraDirectionLook, right));
 	glm::mat4 V = glm::lookAt(
 		cameraPosition,
-		robot.currentKeyframe.position,
+		robot.currentKeyframe.position + glm::vec3(0,0,5),
 		up); //Wylicz macierz widoku
 
     glm::mat4 P=glm::perspective(50.0f*PI/180.0f, aspectRatio, 0.01f, 500.0f); //Wylicz macierz rzutowania
@@ -1391,6 +1428,11 @@ void drawScene(GLFWwindow* window, RobotStructure& robot) {
 
 	for (int i = 0; i < sizeof(robotArmy) / sizeof(robotArmy[0]); i++) {
 		robotArmy[i].drawWholeRobot(P, V);
+	}
+
+	for (int i = 0; i < LIGHT_SOURCES; i++) {
+		lamps[i].applyTransform(glm::mat4(1.0f));
+		lamps[i].drawOpenGL(P, V);
 	}
 
     glfwSwapBuffers(window); //Przerzuć tylny bufor na przedni

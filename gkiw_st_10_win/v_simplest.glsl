@@ -1,6 +1,5 @@
 #version 330
 
-#define LIGHTSOURCES 41
 
 //Zmienne jednorodne
 uniform mat4 P;

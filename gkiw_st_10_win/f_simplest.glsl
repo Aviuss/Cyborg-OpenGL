@@ -1,6 +1,6 @@
 #version 330
 
-#define LIGHTSOURCES 41
+#define LIGHTSOURCES 51
 
 uniform sampler2D textureMap0;
 uniform sampler2D textureMap1;
@@ -85,7 +85,7 @@ vec4 colorPixelByLightSource(vec4 lp, vec4 mn, vec4 mv, vec4 ks, vec4 kd, vec4 c
     
     lightDistance -= 0.55;
 
-	return (color * vec4(nl * kd.rgb, kd.a) + vec4(ks.rgb*rv, 0)) / (0.04*lightDistance*lightDistance+0.1*lightDistance+0.5);
+	return (vec4(nl * kd.rgb * color.rgb, kd.a) + vec4(ks.rgb*rv*color.rgb, 0)) / (0.04*lightDistance*lightDistance+0.1*lightDistance+0.5);
 }
 
 void main(void) {
@@ -99,7 +99,7 @@ void main(void) {
 	vec4 mv = normalize(v);
 
     
-	pixelColor  = vec4(0.1 * kd.rgb, kd.a);//environmental lightning    
+	pixelColor  = vec4(0.1 * kd.rgb, kd.a);//environmental lighting
     for (int i = 0; i < LIGHTSOURCES ; ++i) {
         pixelColor += colorPixelByLightSource(normalize(V* (arrayLights[i] - worldVertex )), mn, mv, ks, kd, arrayLightsColor[i], distance(arrayLights[i] , worldVertex));
     }
@@ -108,7 +108,7 @@ void main(void) {
     float perlin_noise_frequency = 80;
     float perlin_val = perlin((iTexCoord0)*perlin_noise_frequency);
     
-    vec4 fluidColor = vec4(0, perlin_val, 0, 0) + vec4((1-perlin_val)*0.4,(1-perlin_val)*0.4,(1-perlin_val)*0.4,0);
+    vec4 fluidColor = vec4(0, perlin_val, 0, 0) + vec4(0,(1-perlin_val)*0.3,0,0);
 
 	pixelColor = vec4(pixelColor.r * (1-maskTexture.r), pixelColor.g * (1-maskTexture.g), pixelColor.b * (1-maskTexture.b), pixelColor.a * (1-maskTexture.a) );
 	pixelColor = pixelColor + vec4(fluidColor.r*maskTexture.r, fluidColor.g*maskTexture.g, fluidColor.b*maskTexture.b, fluidColor.a*maskTexture.a);
