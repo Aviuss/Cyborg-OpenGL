@@ -7,7 +7,6 @@ uniform sampler2D textureMap1;
 uniform mat4 V;
 uniform sampler2D textureMap2;
 
-in vec4 iC;
 in vec4 n;
 in vec4 v;
 in vec2 iTexCoord0;
@@ -83,21 +82,17 @@ vec4 colorPixelByLightSource(vec4 lp, vec4 mn, vec4 mv, vec4 ks, vec4 kd, vec4 c
 	float nl = clamp(dot(mn, ml), 0, 1); //Kosinus kąta pomiędzy wektorami n i l1.
 	float rv = pow(clamp(dot(mr, mv), 0, 1), 25); // Kosinus kąta pomiędzy wektorami r i v podniesiony do 25 potęgi
     
-    lightDistance -= 0.55;
-
-	return (vec4(nl * kd.rgb * color.rgb, kd.a) + vec4(ks.rgb*rv*color.rgb, 0)) / (0.04*lightDistance*lightDistance+0.1*lightDistance+0.5);
+    lightDistance -= 3.33;
+	return (vec4(nl * kd.rgb * color.rgb, kd.a) + vec4(ks.rgb*rv*color.rgb, 0)) / (0.03*lightDistance*lightDistance+0.2*lightDistance+0.7);
 }
 
 void main(void) {
-    
-    
     vec4 kd = texture(textureMap0, iTexCoord0);
 	vec4 ks = texture(textureMap1, iTexCoord0);
 	vec4 maskTexture = texture(textureMap2, iTexCoord0);
     
 	vec4 mn = normalize(n);
 	vec4 mv = normalize(v);
-
     
 	pixelColor  = vec4(0.1 * kd.rgb, kd.a);//environmental lighting
     for (int i = 0; i < LIGHTSOURCES ; ++i) {

@@ -12,11 +12,11 @@ uniform vec4 lp2;
 
 //Atrybuty
 in vec4 vertex; //wspolrzedne wierzcholka w przestrzeni modelu
-in vec4 color; //kolor wierzchołka
+//in vec4 color; //kolor wierzchołka
 in vec4 normal; //wektor normalny wierzchołka w przestrzeni modelu
 in vec2 texCoord0;
 
-out vec4 iC;
+
 out vec4 n;
 out vec4 v;
 out vec2 iTexCoord0;
@@ -28,7 +28,6 @@ void main(void) {
 
     n = normalize(V * M * normal);//znormalizowany wektor normalny w przestrzeni oka
     v = normalize(vec4(0, 0, 0, 1) - V * worldVertex ); //Wektor do obserwatora w przestrzeni oka
-    iC = color;
     
     iTexCoord0 = texCoord0;
 
