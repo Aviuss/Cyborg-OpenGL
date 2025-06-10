@@ -18,3 +18,6 @@
 
 ## Użyte tekstury i obrazki:
 *(tu można dodać listę lub opisy użytych tekstur i obrazków)*
+- https://www.cgtrader.com/free-3d-models/character/sci-fi-character/iron-monger-low-poly-3d-model
+- https://polyhaven.com/a/rusty_metal_04
+- https://www.poliigon.com/texture/palladiana-galaxy-terrazzo-texture-black/7380

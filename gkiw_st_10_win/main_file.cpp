@@ -1231,6 +1231,7 @@ void initOpenGLProgram(GLFWwindow* window) {
 	mainRobot.texture_metal = &tex_rusty_metal_metalness;
 	mainRobot.texture_mask = &tex_robot_fluid_mask_effect;
 	mainRobot.lightSourcePosition = &arrayLights[0];
+	mainRobot.currentKeyframe.position.x = 30;
 	arrayLightsColor[0] = glm::vec4(0, 0.4, 0, 1);
 	loadRobot(mainRobot);
 
@@ -1325,7 +1326,7 @@ void initOpenGLProgram(GLFWwindow* window) {
 
 		int row = i / 10;
 		int col = i % 10;
-		robotArmy[i].currentKeyframe.position = glm::vec3(row * 10 - 10, col * 20 + 30, 0);
+		robotArmy[i].currentKeyframe.position = glm::vec3(row * 10 - 10, col * 20 + 30 - 70, 0);
 
 		robotArmy[i].lightSourcePosition = &arrayLights[i + 1];
 		arrayLightsColor[i + 1] = glm::vec4(0, 0.4, 0, 1);
